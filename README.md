@@ -52,5 +52,5 @@ See file `mask_to_points.py`:
 ## `neubiaswg5.metrics`
 
 
-Test_ComputeMetrics is a sample wrapper script calling the benchmarking module (ComputeMetrics), some calls and sample images are  provided (see Test_ComputeMetric).
+test/metrics/test_compute_metrics.py is a sample wrapper script calling the benchmarking module (ComputeMetrics), some calls and sample images are provided.
 
