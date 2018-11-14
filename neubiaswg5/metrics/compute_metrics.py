@@ -3,7 +3,7 @@
 # reffile:     	    Reference images (ground truth)
 # problemclass:     Problem class (6 character string, see below)
 # tmpfolder:        A temporary folder required for some metric computation
-# extra_params:     A list of possible extra parameters required by some of the metrics
+
 #
 # Returns:
 #  metrics_dict: mapping metrics name with their value
@@ -19,31 +19,29 @@
 # "PrtTrk"      Particle (point) tracking (Particle Tracking Challenge metric), maximum linking distance set to a fixed value
 # "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), for object divisions requires an extra text file encoding division locations
 
-import os
 import re
-import sys
 import shutil
+import sys
+
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import confusion_matrix
-#from skimage.morphology import ball
-#from skimage.morphology import dilation
 import numpy as np
 from scipy import ndimage
-import tifffile as tiff
 from .img_to_xml import *
 from .img_to_seq import *
 
-def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, extra_params=None):
+
+def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, verbose=True, **extra_params):
     """Runs compute metrics for all pairs of in and ref files.
     Metrics and parameters values are returned in a dictionary mapping the metrics and parameters names with
     a list of respective values (as many as pair of files).
     """
     results = dict()
     for infile, reffile in zip(infiles, refiles):
-        metrics, params = computemetrics(infile, reffile, problemclass, tmpfolder, extra_params=extra_params)
+        metrics, params = computemetrics(infile, reffile, problemclass, tmpfolder, verbose=verbose, **extra_params)
 
         def extend_list_dict(all_dict, curr_dict):
             for metric_name, metric_value in curr_dict.items():
@@ -55,8 +53,20 @@ def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, extra_params
     return results
 
 
-def computemetrics(infile, reffile, problemclass, tmpfolder, extra_params=None):
+def computemetrics(infile, reffile, problemclass, tmpfolder, verbose=True, **extra_params):
+    # to suppress output
+    try:
+        with open(os.path.devnull, "w") as devnull:
+            if not verbose:
+                sys.stderr, sys.stdout = devnull, devnull
+            outputs = _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params)
+    finally:
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+    return outputs
 
+
+def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
     # Remove all xml and txt (temporary) files in tmpfolder
     filelist = [ f for f in os.listdir(tmpfolder) if (f.endswith(".xml") or f.endswith(".txt")) ]
     for f in filelist:
@@ -132,8 +142,7 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, extra_params=None):
         indx = np.nonzero(np.logical_or(Pred_Data,True_Data))
         Dst1_onskl = Dst1[indx]
         Dst2_onskl = Dst2[indx]
-        gating_dist = 5
-        if extra_params is not None: gating_dist = int(extra_params[0])
+        gating_dist = extra_params.get("gating_dist", 5)
 
         metrics_dict["UNMATCHED_VOXEL_RATE"] = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
         params_dict["GATING_DIST"] = gating_dist
@@ -149,8 +158,7 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, extra_params=None):
         indx = np.nonzero(np.logical_or(Pred_Data,True_Data))
         Dst1_onskl = Dst1[indx]
         Dst2_onskl = Dst2[indx]
-        gating_dist = 5
-        if extra_params is not None: gating_dist = int(extra_params[0])
+        gating_dist = extra_params.get("gating_dist", 5)
 
         metrics_dict["UNMATCHED_VOXEL_RATE"] = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
         params_dict["GATING_DIST"] = gating_dist
@@ -169,9 +177,8 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, extra_params=None):
         in_xml_fname = os.path.join(tmpfolder, "intracks.xml")
         tracks_to_xml(in_xml_fname, img_to_tracks(infile), False)
         # the third parameter represents the gating distance
-        gating_dist = ''
-        if extra_params is not None: gating_dist = extra_params[0]
-        os.system('java -jar /usr/bin/DetectionPerformance.jar ' + ref_xml_fname + ' ' + in_xml_fname + ' ' + gating_dist)
+        gating_dist = extra_params.get("gating_dist", 5)
+        os.system('java -jar /usr/bin/DetectionPerformance.jar ' + ref_xml_fname + ' ' + in_xml_fname + ' ' + str(gating_dist))
 
         # Parse *.score.txt file created automatically in tmpfolder
         with open(in_xml_fname+".score.txt", "r") as f:
@@ -189,9 +196,8 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, extra_params=None):
         tracks_to_xml(in_xml_fname, img_to_tracks(infile), True)
         res_fname = in_xml_fname + ".score.txt"
         # the fourth parameter represents the gating distance
-        gating_dist = ''
-        if extra_params is not None: gating_dist = extra_params[0]
-        os.system('java -jar /usr/bin/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + gating_dist)
+        gating_dist = extra_params.get("gating_dist", '')
+        os.system('java -jar /usr/bin/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
 
         # Parse the output file created automatically in tmpfolder
         with open(res_fname, "r") as f:
@@ -229,8 +235,8 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, extra_params=None):
 
         # Run the evaluation routines
         measure_fname = os.path.join(tmpfolder, "measures.txt")
-        os.system("/usr/bin/SEGMeasure.exe " + tmpfolder + " 01 >> " + measure_fname)
-        os.system("/usr/bin/TRAMeasure.exe " + tmpfolder + " 01 >> " + measure_fname)
+        os.system("SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        os.system("TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
 
         #Parse the output file with the measured scores
         with open(measure_fname, "r") as f:
