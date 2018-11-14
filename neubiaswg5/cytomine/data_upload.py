@@ -50,8 +50,8 @@ def upload_data_objseg(cj: CytomineJob, in_images, out_path, **monitor_params):
         collection.save()
 
 
-def upload_data(problemclass, cj: CytomineJob, samples, out_path, **monitor_params):
+def upload_data(problemclass, cj: CytomineJob, inputs, out_path, **monitor_params):
     if problemclass == "ObjSeg":
-        upload_data_objseg(cj, samples, out_path=out_path, **monitor_params)
+        upload_data_objseg(cj, inputs, out_path=out_path, **monitor_params)
     else:
         raise ValueError("Unknown problemclass '{}'.".format(problemclass))
