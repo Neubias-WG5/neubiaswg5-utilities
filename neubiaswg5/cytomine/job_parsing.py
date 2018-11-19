@@ -80,8 +80,22 @@ class NeubiasJob(object):
         flags_ap.add_argument("--descriptor", dest="descriptor", default="descriptor.json", required=False,
                               help="A path to a descriptor.json file. This file will be used to check parameters if the"
                                    " three 'no' flags are raised.")
+        flags_ap.add_argument("--infolder", dest="infolder", default=None, required=False,
+                              help="Absolute path to the container folder where the input data to be processed is "
+                                   "stored. If not specified, a custom folder is created and used by the workflow.")
+        flags_ap.add_argument("--outfolder", dest="outfolder", default=None, required=False,
+                              help="Absolute path to the container folder where the output data will be generated."
+                                   "If not specified, a custom folder is created and used by the workflow.")
+        flags_ap.add_argument("--gtfolder", dest="gtfolder", default=None, required=False,
+                              help="Absolute path to the container folder where the ground truth to be processed is "
+                                   "stored. If not specified, a custom folder is created and used by the workflow.")
         flags_ap.set_defaults(do_download=True, do_export=True, do_compute_metrics=True)
         flags, _ = flags_ap.parse_known_args(argv)
+
+        if not flags.do_download and flags.infolder is None:
+            raise ValueError("When --nodownload is raised, an --infolder should be specified.")
+        if flags.do_compute_metrics and not flags.do_download and flags.gtfolder:
+            raise ValueError("When --nodownload is raised and --nometrics is not, a --gtfolder should be specified.")
 
         # Cytomine is needed if at least one flag is not raised.
         if flags.do_download or flags.do_export or flags.do_compute_metrics:
