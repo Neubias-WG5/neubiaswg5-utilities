@@ -8,19 +8,19 @@ from neubiaswg5 import CLASS_OBJSEG
 from neubiaswg5.cytomine.util import default_value, makedirs_ifnotexists
 
 
-def prepare_objseg_data(cj: CytomineJob, in_path, gt_path, gt_suffix="_lbl", nodownload=False, is_2d=True):
+def prepare_objseg_data(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
     """Prepare data for ObjSeg problemclass
-    Download input and ground truth images (if nodownload is false)
+    Download input and ground truth images (if do_download is false)
     """
-    if nodownload:
+    if not do_download:
         in_images = [os.path.join(in_path, f) for f in os.listdir(in_path)]
         gt_images = [os.path.join(gt_path, f) for f in os.listdir(gt_path)]
         return in_images, gt_images
 
     collection_class = ImageInstanceCollection if is_2d else ImageGroupCollection
 
-    cj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
-    images = collection_class().fetch_with_filter("project", cj.parameters.cytomine_id_project)
+    nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
+    images = collection_class().fetch_with_filter("project", nj.parameters.cytomine_id_project)
     in_images = [i for i in images if gt_suffix not in i.originalFilename]
     gt_images = [i for i in images if gt_suffix in i.originalFilename]
 
@@ -36,7 +36,7 @@ def prepare_objseg_data(cj: CytomineJob, in_path, gt_path, gt_suffix="_lbl", nod
     return in_images, gt_images
 
 
-def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None, nodownload=False, infolder=None,
+def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
                  outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, **kwargs):
     """Prepare data from parameters.
 
@@ -56,15 +56,15 @@ def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None
     ----------
     problemclass: str
         One of the problemclass
-    cj: CytomineJob|None
-        The cytomine job instance (including parameters). Can be None if no communication to the server is required.
+    nj: CytomineJob|NeubiasJob
+        A CytomineJob or NeubiasJob instance.
     gt_suffix: str
         Ground truth images suffix
     base_path: str
         Base path for data download. Defaults to the '$HOME/{run_id}/'. If a CytomineJob was passed `run_id` is the
         current job id. Otherwise, `run_id` is "standalone".
-    nodownload: bool
-        True if data shouldn't be downloaded
+    do_download: bool
+        True if data should be downloaded.
     infolder: str|None
         Full path of the folder for input data. If None, defaults to '`base_path`/in'.
     outfolder: str|None
@@ -96,7 +96,7 @@ def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None
     """
     # get path
     base_path = default_value(base_path, Path.home())
-    working_path = os.path.join(base_path, "standalone" if cj is None else str(cj.job.id))
+    working_path = os.path.join(base_path, "standalone" if nj is None else str(nj.job.id))
     in_path = default_value(infolder, os.path.join(working_path, "in"))
     out_path = default_value(outfolder, os.path.join(working_path, "out"))
     gt_path = default_value(gtfolder, os.path.join(working_path, "ground_truth"))
@@ -109,7 +109,7 @@ def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None
     makedirs_ifnotexists(tmp_path)
 
     if problemclass == CLASS_OBJSEG:
-        in_data, gt_data = prepare_objseg_data(cj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix, nodownload=nodownload)
+        in_data, gt_data = prepare_objseg_data(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix, do_download=do_download)
     else:
         raise ValueError("Unknown problemclass '{}'.".format(problemclass))
 
