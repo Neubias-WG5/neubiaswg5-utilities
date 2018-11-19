@@ -30,6 +30,9 @@ from sklearn.metrics import recall_score
 from sklearn.metrics import confusion_matrix
 import numpy as np
 from scipy import ndimage
+import tifffile as tiff
+
+from neubiaswg5 import *
 from .img_to_xml import *
 from .img_to_seq import *
 
@@ -80,7 +83,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
     params_dict = {}
 
     # Switch problemclass
-    if problemclass == "ObjSeg":
+    if problemclass == CLASS_OBJSEG:
 
         # Call Visceral (compiled) to compute DICE and average Hausdorff distance
         os.system("Visceral "+infile+" "+reffile+" -use DICE,AVGDIST -xml "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
@@ -93,7 +96,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metric_names = ["DICE_COEFFICIENT", "AVERAGE_HAUSDORFF_DISTANCE"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
 
-    elif problemclass == "SptCnt":
+    elif problemclass == CLASS_SPTCNT:
 
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
@@ -107,7 +110,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         metrics_dict["RELATIVE_ERROR_COUNT"] = bchmetrics
 
-    elif problemclass == "PixCla":
+    elif problemclass == CLASS_PIXCLA:
 
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
@@ -131,7 +134,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict["PRECISION"] = precision_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
         metrics_dict["RECALL"] = recall_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
 
-    elif problemclass == "TreTrc":
+    elif problemclass == CLASS_TRETRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
@@ -147,7 +150,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict["UNMATCHED_VOXEL_RATE"] = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
         params_dict["GATING_DIST"] = gating_dist
 
-    elif problemclass == "LooTrc":
+    elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
@@ -170,7 +173,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         #dildice = 2*sum(Msk1&Msk2)/(sum(Msk1)+sum(Msk2))
         #bchmetrics = [dildice]
 
-    elif problemclass == "ObjDet":
+    elif problemclass == CLASS_OBJDET:
 
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
         tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), False)
@@ -188,7 +191,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
         params_dict["GATING_DIST"] = gating_dist
 
-    elif problemclass == "PrtTrk":
+    elif problemclass == CLASS_PRTTRK:
 
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
         tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), True)
@@ -212,7 +215,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
         params_dict["GATING_DIST"] = gating_dist
 
-    elif problemclass == "ObjTrk":
+    elif problemclass == CLASS_OBJTRK:
 
         # Convert the data into the Cell Tracking Challenge format
         ctc_gt_folder = os.path.join(tmpfolder, "01_GT")
