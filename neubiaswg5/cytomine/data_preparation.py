@@ -1,14 +1,11 @@
 import os
+from pathlib import Path
+
 from cytomine import CytomineJob
 from cytomine.models import ImageInstanceCollection, ImageGroupCollection
 
 from neubiaswg5 import CLASS_OBJSEG
-
-
-def makedirs_ifnotexists(folder):
-    """Create folder if not exists"""
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+from neubiaswg5.cytomine.util import default_value, makedirs_ifnotexists
 
 
 def prepare_objseg_data(cj: CytomineJob, in_path, gt_path, gt_suffix="_lbl", nodownload=False, is_2d=True):
@@ -39,8 +36,8 @@ def prepare_objseg_data(cj: CytomineJob, in_path, gt_path, gt_suffix="_lbl", nod
     return in_images, gt_images
 
 
-def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None, nodownload=False, infolder="in",
-                 outfolder="out", gtfolder="ground_truth", tmp_folder="tmp", is_2d=True, **kwargs):
+def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None, nodownload=False, infolder=None,
+                 outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, **kwargs):
     """Prepare data from parameters.
 
     If nodownload is false, creates four folders in `base_path`:
@@ -59,22 +56,23 @@ def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None
     ----------
     problemclass: str
         One of the problemclass
-    cj: CytomineJob
-        The cytomine job instance (including parameters)
+    cj: CytomineJob|None
+        The cytomine job instance (including parameters). Can be None if no communication to the server is required.
     gt_suffix: str
         Ground truth images suffix
     base_path: str
-        Base path for data download
+        Base path for data download. Defaults to the '$HOME/{run_id}/'. If a CytomineJob was passed `run_id` is the
+        current job id. Otherwise, `run_id` is "standalone".
     nodownload: bool
         True if data shouldn't be downloaded
-    infolder: str
-        Name of folder for input data
-    outfolder: str
-        Name of folder for output data
-    gtfolder: str
-        Name of folder for ground truth data
+    infolder: str|None
+        Full path of the folder for input data. If None, defaults to '`base_path`/in'.
+    outfolder: str|None
+        Full path of the folder for output data. If None, defaults to '`base_path`/out'.
+    gtfolder: str|None
+        Full path of the folder for ground truth data. If None, defaults to '`base_path`/ground_truth'.
     tmp_folder: str
-        Name for temporary data folder
+        Name (not the path) for temporary data folder.
     is_2d: bool
         True if the problem is a 2d one, False otherwise (3D, 4D, 3D+t).
 
@@ -96,20 +94,18 @@ def prepare_data(problemclass, cj: CytomineJob, gt_suffix="_lbl", base_path=None
     tmp_path: str
         Full path to tmp data folder
     """
-    if base_path is None:
-        base_path = "{}".format(os.getenv("HOME"))
-    working_path = os.path.join(base_path, str(cj.job.id))
+    # get path
+    base_path = default_value(base_path, Path.home())
+    working_path = os.path.join(base_path, "standalone" if cj is None else str(cj.job.id))
+    in_path = default_value(infolder, os.path.join(working_path, "in"))
+    out_path = default_value(outfolder, os.path.join(working_path, "out"))
+    gt_path = default_value(gtfolder, os.path.join(working_path, "ground_truth"))
     tmp_path = os.path.join(working_path, tmp_folder)
-    in_path = infolder if nodownload else os.path.join(working_path, infolder)
-    out_path = outfolder if nodownload else os.path.join(working_path, outfolder)
-    gt_path = gtfolder if nodownload else os.path.join(working_path, gtfolder)
 
     # create directories
-    if not nodownload:
-        makedirs_ifnotexists(in_path)
-        makedirs_ifnotexists(out_path)
-        makedirs_ifnotexists(gt_path)
-
+    makedirs_ifnotexists(in_path)
+    makedirs_ifnotexists(out_path)
+    makedirs_ifnotexists(gt_path)
     makedirs_ifnotexists(tmp_path)
 
     if problemclass == CLASS_OBJSEG:
