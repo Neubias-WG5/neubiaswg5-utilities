@@ -31,7 +31,7 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     do_compute_metrics: bool
         Whether or not to compute and upload the metrics.
     """
-    if do_compute_metrics:
+    if not do_compute_metrics:
         return
     if metric_params is None:
         metric_params = dict()

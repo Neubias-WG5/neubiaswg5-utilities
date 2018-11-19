@@ -61,8 +61,7 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     gt_suffix: str
         Ground truth images suffix
     base_path: str
-        Base path for data download. Defaults to the '$HOME/{run_id}/'. If a CytomineJob was passed `run_id` is the
-        current job id. Otherwise, `run_id` is "standalone".
+        Base path for data download. Defaults to the '$HOME/{nj.job.id}/'.
     do_download: bool
         True if data should be downloaded.
     infolder: str|None
@@ -96,7 +95,7 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     """
     # get path
     base_path = default_value(base_path, Path.home())
-    working_path = os.path.join(base_path, "standalone" if nj is None else str(nj.job.id))
+    working_path = os.path.join(base_path, str(nj.job.id))
     in_path = default_value(infolder, os.path.join(working_path, "in"))
     out_path = default_value(outfolder, os.path.join(working_path, "out"))
     gt_path = default_value(gtfolder, os.path.join(working_path, "ground_truth"))

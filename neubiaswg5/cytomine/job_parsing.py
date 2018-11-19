@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 
 from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
 
-# from neubiaswg5.cytomine.util import check_field
+from neubiaswg5.cytomine.util import check_field
 
 
 class NeubiasParameter(object):
@@ -36,9 +36,13 @@ class NeubiasParameter(object):
 
 
 class FakeUpdatableJob(object):
+    @property
+    def id(self):
+        return "standalone"
+
     """A fake job that can be updated."""
     def update(self, progress=0, status="", statusComment="", **kwargs):
-        logging.log(logging.INFO, "Progress:{: <3d}% ... Status: {} - '{}'".format(progress, status, statusComment))
+        print("Progress:{: <3d}% ... Status: {: >1d} - '{}'".format(progress, status, statusComment))
 
 
 class NeubiasJob(object):
@@ -77,7 +81,7 @@ class NeubiasJob(object):
                               help="Whether or not to compute and upload the metrics to the BIAFLOWS/local server. If "
                                    "--nodownload is raised but --nometrics is not, then the absolute path to the folder"
                                    " containing the ground truth data should be provided through --gtfolder.")
-        flags_ap.add_argument("--descriptor", dest="descriptor", default="descriptor.json", required=False,
+        flags_ap.add_argument("--descriptor", dest="descriptor", default="/app/descriptor.json", required=False,
                               help="A path to a descriptor.json file. This file will be used to check parameters if the"
                                    " three 'no' flags are raised.")
         flags_ap.add_argument("--infolder", dest="infolder", default=None, required=False,
@@ -94,7 +98,7 @@ class NeubiasJob(object):
 
         if not flags.do_download and flags.infolder is None:
             raise ValueError("When --nodownload is raised, an --infolder should be specified.")
-        if flags.do_compute_metrics and not flags.do_download and flags.gtfolder:
+        if flags.do_compute_metrics and not flags.do_download and flags.gtfolder is None:
             raise ValueError("When --nodownload is raised and --nometrics is not, a --gtfolder should be specified.")
 
         # Cytomine is needed if at least one flag is not raised.
@@ -116,7 +120,7 @@ class NeubiasJob(object):
             job_parameters = [p for p in parameters if not p.name.startswith("cytomine")]
             argparse = _software_params_to_argparse(job_parameters)
             base_params, _ = argparse.parse_known_args(args=argv)
-            return NeubiasJob(base_params, vars(flags))
+            return NeubiasJob(vars(flags), base_params)
 
     def __enter__(self):
         return self
