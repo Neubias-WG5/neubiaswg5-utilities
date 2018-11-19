@@ -19,6 +19,7 @@ docker run -v $LOCAL_INPUT:/data/in $LOCAL_OUTPUT:/data/out $LOCAL_GROUND_TRUTH:
     --gtfolder /data/gt
 ```
 
+where `$LOCAL_INPUT`, `$LOCAL_OUTPUT` and `$LOCAL_GROUND_TRUTH` are the local data folders (i.e. on your host).
 
 ## Install
 
