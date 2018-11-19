@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 
 from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
 
-from neubiaswg5.cytomine.util import check_field
+# from neubiaswg5.cytomine.util import check_field
 
 
 class NeubiasParameter(object):
@@ -100,7 +100,7 @@ class NeubiasJob(object):
         # Cytomine is needed if at least one flag is not raised.
         if flags.do_download or flags.do_export or flags.do_compute_metrics:
             cj = CytomineJob.from_cli(argv, **kwargs)
-            cj.flags = flags  # append the flags
+            cj.flags = vars(flags)  # append the flags
             return cj
 
         with open(flags.descriptor, "r") as file:
@@ -116,7 +116,7 @@ class NeubiasJob(object):
             job_parameters = [p for p in parameters if not p.name.startswith("cytomine")]
             argparse = _software_params_to_argparse(job_parameters)
             base_params, _ = argparse.parse_known_args(args=argv)
-            return NeubiasJob(base_params, flags)
+            return NeubiasJob(base_params, vars(flags))
 
     def __enter__(self):
         return self
