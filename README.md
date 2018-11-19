@@ -2,6 +2,24 @@
 
 Utilities for Neubias WG5 softwares
 
+## Running workflows locally
+
+You can run workflows without communicating with neubias
+
+Requirements:
+- in the workflow Dockerfile: `ADD descriptor.json /app/descriptor.json`
+
+Then run:
+```bash
+docker run -v $LOCAL_INPUT:/data/in $LOCAL_OUTPUT:/data/out $LOCAL_GROUND_TRUTH:/data/gt -it DOCKER_TAG \
+    (workflow parameters ...)
+    --nodownload --noexport --nometrics \
+    --infolder /data/in \
+    --outfolder /data/out \
+    --gtfolder /data/gt
+```
+
+
 ## Install
 
 Some installation steps have to be performed manually:
