@@ -5,10 +5,7 @@ from argparse import ArgumentParser
 
 from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
 
-def check_field(d, f, target="dictionary"):
-    if f not in d:
-        raise ValueError("Missing field '{}' in {}".format(f, target))
-    return d[f]
+from neubiaswg5.cytomine.util import check_field
 
 
 class NeubiasParameter(object):
