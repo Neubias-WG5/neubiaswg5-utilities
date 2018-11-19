@@ -1,10 +1,9 @@
 import json
+import logging
 import sys
 from argparse import ArgumentParser
 
-
 from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
-
 
 def check_field(d, f, target="dictionary"):
     if f not in d:
@@ -39,14 +38,29 @@ class NeubiasParameter(object):
         return self._defaultParamValue
 
 
+class FakeUpdatableJob(object):
+    """A fake job that can be updated."""
+    def update(self, progress=0, status="", statusComment="", **kwargs):
+        logging.log(logging.INFO, "Progress:{: <3d}% ... Status: {} - '{}'".format(progress, status, statusComment))
+
+
 class NeubiasJob(object):
     """Equivalent of CytomineJob but that can run without a Cytomine server. Can be used with a context manager"""
-    def __init__(self, parameters):
+    def __init__(self, flags, parameters):
         self._parameters = parameters
+        self._flags = flags
 
     @property
     def parameters(self):
         return self._parameters
+
+    @property
+    def flags(self):
+        return self._flags
+
+    @property
+    def job(self):
+        return FakeUpdatableJob()
 
     @staticmethod
     def from_cli(argv, **kwargs):
@@ -66,14 +80,19 @@ class NeubiasJob(object):
                               help="Whether or not to compute and upload the metrics to the BIAFLOWS/local server. If "
                                    "--nodownload is raised but --nometrics is not, then the absolute path to the folder"
                                    " containing the ground truth data should be provided through --gtfolder.")
+        flags_ap.add_argument("--descriptor", dest="descriptor", default="descriptor.json", required=False,
+                              help="A path to a descriptor.json file. This file will be used to check parameters if the"
+                                   " three 'no' flags are raised.")
         flags_ap.set_defaults(do_download=True, do_export=True, do_compute_metrics=True)
         flags, _ = flags_ap.parse_known_args(argv)
 
         # Cytomine is needed if at least one flag is not raised.
         if flags.do_download or flags.do_export or flags.do_compute_metrics:
-            return CytomineJob.from_cli(argv, **kwargs)
+            cj = CytomineJob.from_cli(argv, **kwargs)
+            cj.flags = flags  # append the flags
+            return cj
 
-        with open("descriptor.json", "r") as file:
+        with open(flags.descriptor, "r") as file:
             software_desc = json.load(file)
 
             if software_desc is None or "inputs" not in software_desc:
@@ -86,7 +105,7 @@ class NeubiasJob(object):
             job_parameters = [p for p in parameters if not p.name.startswith("cytomine")]
             argparse = _software_params_to_argparse(job_parameters)
             base_params, _ = argparse.parse_known_args(args=argv)
-            return NeubiasJob(base_params)
+            return NeubiasJob(base_params, flags)
 
     def __enter__(self):
         return self
