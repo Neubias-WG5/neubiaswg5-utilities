@@ -42,7 +42,7 @@ class FakeUpdatableJob(object):
 
     """A fake job that can be updated."""
     def update(self, progress=0, status="", statusComment="", **kwargs):
-        print("Progress:{: <3d}% ... Status: {: >1d} - '{}'".format(progress, status, statusComment))
+        print("Progress: {: <3d}% ... Status: {: >1} - '{}'".format(progress, str(status), statusComment))
 
 
 class NeubiasJob(object):

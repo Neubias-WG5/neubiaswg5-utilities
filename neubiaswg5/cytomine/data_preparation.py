@@ -8,6 +8,23 @@ from neubiaswg5 import CLASS_OBJSEG
 from neubiaswg5.cytomine.util import default_value, makedirs_ifnotexists
 
 
+def get_image_name(image, is_2d=True):
+    """
+    Parameters
+    ----------
+    image: ImageInstance|ImageGroup
+        An image group
+    is_2d: bool
+        True if 2d then image is an ImageInstance. Otherwise 3d, then image is a ImageGroup.
+    Returns
+    -------
+    """
+    if is_2d:
+        return image.originalFilename
+    else:
+        return image.name
+
+
 def prepare_objseg_data(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
     """Prepare data for ObjSeg problemclass
     Download input and ground truth images (if do_download is false)
@@ -21,15 +38,15 @@ def prepare_objseg_data(nj, in_path, gt_path, gt_suffix="_lbl", do_download=Fals
 
     nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
     images = collection_class().fetch_with_filter("project", nj.parameters.cytomine_id_project)
-    in_images = [i for i in images if gt_suffix not in i.originalFilename]
-    gt_images = [i for i in images if gt_suffix in i.originalFilename]
+    in_images = [i for i in images if gt_suffix not in get_image_name(i, is_2d=is_2d)]
+    gt_images = [i for i in images if gt_suffix in get_image_name(i, is_2d=is_2d)]
 
     for input_image in in_images:
         input_image.download(os.path.join(in_path, "{id}.tif"))
 
     for gt_image in gt_images:
-        related_name = gt_image.originalFilename.replace(gt_suffix, '')
-        related_image = [i for i in in_images if related_name == i.originalFilename]
+        related_name = get_image_name(gt_image, is_2d=is_2d).replace(gt_suffix, '')
+        related_image = [i for i in in_images if related_name == get_image_name(i, is_2d=is_2d)]
         if len(related_image) == 1:
             gt_image.download(os.path.join(gt_path, "{}.tif".format(related_image[0].id)))
 
