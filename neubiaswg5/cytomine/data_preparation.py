@@ -4,7 +4,7 @@ from pathlib import Path
 from cytomine import CytomineJob
 from cytomine.models import ImageInstanceCollection, ImageGroupCollection
 
-from neubiaswg5 import CLASS_OBJSEG
+from neubiaswg5 import CLASS_OBJSEG, CLASS_OBJTRK, CLASS_LOOTRC, CLASS_TRETRC
 from neubiaswg5.cytomine.util import default_value, makedirs_ifnotexists
 
 
@@ -25,9 +25,8 @@ def get_image_name(image, is_2d=True):
         return image.name
 
 
-def prepare_objseg_data(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
-    """Prepare data for ObjSeg problemclass
-    Download input and ground truth images (if do_download is false)
+def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
+    """Download input and ground truth images (if do_download is false)
     """
     if not do_download:
         in_images = [os.path.join(in_path, f) for f in os.listdir(in_path)]
@@ -124,9 +123,12 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     makedirs_ifnotexists(gt_path)
     makedirs_ifnotexists(tmp_path)
 
-    if problemclass == CLASS_OBJSEG:
-        in_data, gt_data = prepare_objseg_data(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix, do_download=do_download)
-    else:
-        raise ValueError("Unknown problemclass '{}'.".format(problemclass))
+    # in all cases download input and gt
+    in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix, do_download=do_download)
+
+    # download additional data
+    if problemclass == CLASS_TRETRC or problemclass == CLASS_LOOTRC or problemclass == CLASS_OBJTRK:
+        raise NotImplementedError("Problemclass '{}' needs additional data. Download of this "
+                                  "data hasn't been implemented yet".format(problemclass))
 
     return in_data, gt_data, in_path, gt_path, out_path, tmp_path
