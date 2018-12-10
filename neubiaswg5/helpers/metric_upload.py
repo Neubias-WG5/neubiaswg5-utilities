@@ -36,18 +36,15 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     if metric_params is None:
         metric_params = dict()
     additional_properties = dict() # properties to be added in addition to the metrics and their parameters
-    if problemclass == CLASS_OBJSEG:
-        # get image names
-        filenames = ["{}.tif".format(image.id) if do_download else os.path.basename(image) for image in inputs]
-        outfiles, reffiles = zip(*[
-            (os.path.join(out_path, filename),
-             os.path.join(gt_path, filename))
-            for filename in filenames
-        ])
-        additional_properties["IMAGES"] = str([im.id if do_download else os.path.basename(im) for im in inputs])
-    else:
-        raise ValueError("Unknown problemclass '{}'.".format(problemclass))
 
+    # get image names
+    filenames = ["{}.tif".format(image.id) if do_download else os.path.basename(image) for image in inputs]
+    outfiles, reffiles = zip(*[
+        (os.path.join(out_path, filename),
+         os.path.join(gt_path, filename))
+        for filename in filenames
+    ])
+    additional_properties["IMAGES"] = str([im.id if do_download else os.path.basename(im) for im in inputs])
     results = computemetrics_batch(outfiles, reffiles, problemclass, tmp_path, **metric_params)
 
     for key, value in results.items():
