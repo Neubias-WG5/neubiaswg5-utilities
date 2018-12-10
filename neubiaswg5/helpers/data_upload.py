@@ -5,6 +5,7 @@ import numpy as np
 from skimage import io
 from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
+from tifffile import tifffile
 
 from neubiaswg5 import CLASS_OBJSEG, CLASS_SPTCNT, CLASS_OBJDET
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
@@ -99,7 +100,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
 
         if generate_mask:
             mask = slices_to_mask(points, io.imread(in_image.filename).shape)
-            io.imsave(str(in_image.id) + ".tif", mask)
+            tifffile.imsave(os.path.join(out_path, "{}.tif".format(in_image.id)), mask)
     else:
         # points stored in a mask
         mask = io.imread(path)
