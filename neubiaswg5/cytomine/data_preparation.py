@@ -4,7 +4,7 @@ from pathlib import Path
 from cytomine import CytomineJob
 from cytomine.models import ImageInstanceCollection, ImageGroupCollection
 
-from neubiaswg5 import CLASS_OBJSEG, CLASS_OBJTRK, CLASS_LOOTRC, CLASS_TRETRC
+from neubiaswg5 import CLASS_OBJTRK, CLASS_LOOTRC, CLASS_TRETRC
 from neubiaswg5.cytomine.util import default_value, makedirs_ifnotexists
 
 
@@ -26,7 +26,34 @@ def get_image_name(image, is_2d=True):
 
 
 def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
-    """Download input and ground truth images (if do_download is false)
+    """
+    If do_download is true: download input and ground truth images to in_path and gt_path respectively, and return the
+    corresponding ImageInstance or ImageGroup objects.
+    If do_download is false: list and return images from folders in_path and gt_path
+
+    Parameters
+    ----------
+    nj: NeubiasJob
+        A neubias job
+    in_path: str
+        Path for input images
+    gt_path: str
+        Path for ground truth images
+    gt_suffix: str
+        A suffix for ground truth images filename
+    do_download: bool
+        True for actually downloading the image, False for getting them from in_path and gt_path
+    is_2d: bool
+        True for 2d images
+
+    Returns
+    -------
+    in_images: iterable
+        subtype: ImageInstance|ImageGroup|str
+        Input images
+    gt_images: iterable
+        subtype: ImageInstance|ImageGroup|str
+        Ground truth images
     """
     if not do_download:
         in_images = [os.path.join(in_path, f) for f in os.listdir(in_path)]
