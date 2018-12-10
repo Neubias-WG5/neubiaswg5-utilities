@@ -60,7 +60,7 @@ def extract_annotations_objseg(out_path, in_image, project_id, **kwargs):
     return collection
 
 
-def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, result_file_suffix="_results.txt", has_headers=False, parse_fn=None, **kwargs):
+def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None, result_file_suffix="_results.txt", has_headers=False, parse_fn=None, **kwargs):
     """
     Parameters:
     -----------
@@ -72,6 +72,8 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
     generate_mask: bool
         If result is in a CSV, True for generating a mask based on the points in the csv. Ignored if is_csv is False.
         The mask file is generated in out_path with the name "{in_image.id}.png".
+    in_path: str
+        The path where to find input images. Required when generate mask is present.
     result_file_suffix: str
         Suffix of the result filename (prefix being the image id).
     has_headers: bool
@@ -99,7 +101,8 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
         ])
 
         if generate_mask:
-            mask = slices_to_mask(points, io.imread(in_image.filename).shape)
+            input_path = os.path.join(in_path, in_image.originalFilename)
+            mask = slices_to_mask(points, io.imread(input_path).shape)
             tifffile.imsave(os.path.join(out_path, "{}.tif".format(in_image.id)), mask)
     else:
         # points stored in a mask
