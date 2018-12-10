@@ -1,11 +1,14 @@
 import os
+import sys
+
 import numpy as np
 from skimage import io
 from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
 
-from neubiaswg5 import CLASS_OBJSEG
-from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice
+from neubiaswg5 import CLASS_OBJSEG, CLASS_SPTCNT, CLASS_OBJDET
+from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
+    slices_to_mask, mask_to_points_2d
 from shapely.affinity import affine_transform
 
 
@@ -17,40 +20,105 @@ def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_pro
     )
 
 
-def upload_data_objseg(nj, in_images, out_path, monitor_params=None):
-    if monitor_params is None:
-        monitor_params = dict()
-    if "prefix" not in monitor_params:
-        monitor_params["prefix"] = "Extracting and uploading polygons from masks"
+def get_image_seq_info(image_group):
+    image_sequences = ImageSequenceCollection().fetch_with_filter("imagegroup", image_group.id)
+    height = ImageInstance().fetch(image_sequences[0].image).height
+    return {iseq.zStack: iseq.image for iseq in image_sequences}, height
 
-    for image in nj.monitor(in_images, **monitor_params):
-        file = "{}.tif".format(image.id)
-        path = os.path.join(out_path, file)
-        data = io.imread(path)
 
-        collection = AnnotationCollection()
-        # extract objects
-        if data.ndim == 2:
-            slices = mask_to_objects_2d(data)
-            collection.extend([annotation_from_slice(s, image.id, image.height, nj.project.id) for s in slices])
-        elif data.ndim == 3:
-            # in this case `image` is actually an ImageGroup
-            image_sequences = ImageSequenceCollection().fetch_with_filter("imagegroup", image.id)
-            depth_to_image = {iseq.zStack: iseq.image for iseq in image_sequences}
-            height = ImageInstance().fetch(image_sequences[0].image).height
+def extract_annotations_objseg(out_path, in_image, project_id, **kwargs):
+    """
+    Parameters
+    ----------
+    out_path: str
+    in_image: ImageInstance|ImageGroup
+    project_id: int
+    kwargs: dict
+    """
+    file = "{}.tif".format(in_image.id)
+    path = os.path.join(out_path, file)
+    data = io.imread(path)
 
-            slices = mask_to_objects_3d(np.moveaxis(data, 0, 2), background=0, assume_unique_labels=True)
+    collection = AnnotationCollection()
+    if data.ndim == 2:
+        slices = mask_to_objects_2d(data)
+        collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in slices])
+    elif data.ndim == 3:
+        # in this case `in_image` is actually an ImageGroup
+        slices = mask_to_objects_3d(np.moveaxis(data, 0, 2), background=0, assume_unique_labels=True)
+        depth_to_image, height = get_image_seq_info(in_image)
+
+        collection.extend([
+            annotation_from_slice(
+                slice=s, id_image=depth_to_image[s.depth],
+                image_height=height, id_project=project_id
+            ) for obj in slices for s in obj
+        ])
+    else:
+        raise ValueError("Only supports 2D or 3D output images...")
+    return collection
+
+
+def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, result_file_suffix="_results.txt", has_headers=False, parse_fn=None, **kwargs):
+    """
+    Parameters:
+    -----------
+    out_path: str
+    in_image: ImageInstance|ImageGroup
+    project_id: int
+    is_csv: bool
+        True if the output data are stored in a csv file
+    generate_mask: bool
+        If result is in a CSV, True for generating a mask based on the points in the csv. Ignored if is_csv is False.
+        The mask file is generated in out_path with the name "{in_image.id}.png".
+    result_file_suffix: str
+        Suffix of the result filename (prefix being the image id).
+    has_headers: bool
+        True if the csv contains some headers (ignored if is_csv is False)
+    parse_fn: callable
+        A function for extracting coordinates from the csv file (already separated) line.
+    kwargs: dict
+    """
+    file = str(in_image.id) + result_file_suffix
+    path = os.path.join(out_path, file)
+
+    collection = AnnotationCollection()
+    if not os.path.isfile(path):
+        print("No output file at '{}' for image with id:{}.".format(path, in_image.id), file=sys.stderr)
+        return collection
+
+    # whether the points are stored in a csv or a mask
+    if is_csv:
+        if parse_fn is None:
+            raise ValueError("parse_fn shouldn't be 'None' when result file is a CSV.")
+        points = csv_to_points(path, has_headers=has_headers, parse_fn=parse_fn)
+        collection.extend([
+            annotation_from_slice(slice, in_image.id, in_image.height, project_id)
+            for slice in points
+        ])
+
+        if generate_mask:
+            mask = slices_to_mask(points, io.imread(in_image.filename).shape)
+            io.imsave(str(in_image.id) + ".tif", mask)
+    else:
+        # points stored in a mask
+        mask = io.imread(path)
+
+        if mask.ndim == 2:
+            points = mask_to_points_2d(mask)
+            collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in points])
+        elif mask.ndim == 3:
+            points = mask_to_objects_3d(mask, time=False)
+            depth_to_image, height = get_image_seq_info(in_image)
+
             collection.extend([
                 annotation_from_slice(
                     slice=s, id_image=depth_to_image[s.depth],
-                    image_height=height, id_project=nj.parameters.cytomine_id_project
-                ) for obj in slices for s in obj
+                    image_height=height, id_project=project_id
+                ) for obj in points for s in obj
             ])
-        else:
-            raise ValueError("Only supports 2D or 3D output images...")
 
-        print("Found {} polygons in this image {}.".format(len(slices), image.id))
-        collection.save()
+    return collection
 
 
 def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_download=False, do_export=False, **kwargs):
@@ -72,12 +140,29 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         True if data was downloaded
     do_export: bool
         True if results should be exported
+    kwargs: dict
+        Additional parameters for:
+        * ObjDet/SptCnt: see function 'extract_annotations_objdet'
+        * ObjSeg: see function 'extract_annotations_objseg'
     """
     if not do_export or not do_download:
         return
     if monitor_params is None:
         monitor_params = dict()
+
     if problemclass == CLASS_OBJSEG:
-        upload_data_objseg(nj, inputs, out_path=out_path, monitor_params=monitor_params)
+        extract_fn = extract_annotations_objseg
+    elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT:
+        extract_fn = extract_annotations_objdet
     else:
         raise ValueError("Unknown problemclass '{}'.".format(problemclass))
+
+    collection = AnnotationCollection()
+    monitor_params["prefix"] = "Extract masks/points/... from output data"
+    for image in nj.monitor(inputs, **monitor_params):
+        collection.extend(extract_fn(out_path, image, nj.project.id, **kwargs))
+
+    nj.job.update(statusComment="Upload extracted annotations (total: {})".format(len(collection)))
+    collection.save()
+
+
