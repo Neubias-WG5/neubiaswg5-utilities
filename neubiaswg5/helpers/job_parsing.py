@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 
 from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
 
-from neubiaswg5.cytomine.util import check_field
+from neubiaswg5.helpers.util import check_field
 
 
 class NeubiasParameter(object):

@@ -5,7 +5,7 @@ from cytomine import CytomineJob
 from cytomine.models import ImageInstanceCollection, ImageGroupCollection
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_LOOTRC, CLASS_TRETRC
-from neubiaswg5.cytomine.util import default_value, makedirs_ifnotexists
+from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists
 
 
 def get_image_name(image, is_2d=True):

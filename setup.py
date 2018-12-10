@@ -12,7 +12,7 @@ setup(
                 '(metrics, annotation exporters, cytomine utilities,...)',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=['neubiaswg5', 'neubiaswg5.exporter', 'neubiaswg5.metrics', 'neubiaswg5.cytomine'],
+    packages=['neubiaswg5', 'neubiaswg5.exporter', 'neubiaswg5.metrics', 'neubiaswg5.helpers'],
     url='https://github.com/Neubias-WG5',
     classifiers=[
         'Intended Audience :: Science/Research',
