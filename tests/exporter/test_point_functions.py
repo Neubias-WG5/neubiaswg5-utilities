@@ -5,6 +5,7 @@ from unittest import TestCase
 from shapely.geometry import Point, Polygon, box
 
 from neubiaswg5.exporter import mask_to_points_2d, csv_to_points, AnnotationSlice, slices_to_mask
+from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
 
 
 class TestMaskToPoints(TestCase):
@@ -28,6 +29,22 @@ class TestMaskToPoints(TestCase):
         self.assertEqual(len(slices), 1)
         self.assertIsInstance(slices[0].polygon, Polygon)
         self.assertTrue(slices[0].polygon.equals(box(5, 4, 7, 6)))
+
+    def testSinglePoint3D(self):
+        image = np.zeros([50, 45, 55], dtype=np.int)
+
+        to_draw = {
+            (125, (1, 1, 1)),
+            (255, (1, 44, 27))
+        }
+
+        for l, (y, x, z) in list(to_draw):
+            image[y, x, z] = l
+
+        points = mask_to_points_3d(image)
+
+        self.assertEqual(len(points), 2)
+        self.assertSetEqual(to_draw, {(s.label, (s.polygon.y, s.polygon.x, s.depth)) for s in points})
 
 
 class TestCsvToPoints(TestCase):

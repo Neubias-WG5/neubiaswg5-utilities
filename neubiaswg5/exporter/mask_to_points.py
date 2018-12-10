@@ -30,6 +30,33 @@ def mask_to_points_2d(mask, points=True):
     ]
 
 
+def mask_to_points_3d(mask, time=False):
+    """Converts a point label 3D mask to a set of points.
+
+    Parameters
+    ----------
+    mask: ndarray
+        The point label mask
+    time: bool
+        True if the third dimension is the time
+
+    Returns
+    -------
+    slices: list
+        List of annotations slices
+    """
+    pixels = np.nonzero(mask)
+    labels = mask[pixels]
+    return [
+        AnnotationSlice(
+            polygon=Point(x, y),
+            label=label,
+            time=None if not time else z,
+            depth=None if time else z
+        ) for (y, x, z), label in zip(zip(*pixels), labels)
+    ]
+
+
 def csv_to_points(filepath, sep='\t', parse_fn=None, has_z=False, has_t=False, has_headers=False):
     """Extract a set of points coordinates from a csv file.
     Parameters
