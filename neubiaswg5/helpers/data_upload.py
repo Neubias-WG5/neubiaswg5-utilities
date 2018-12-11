@@ -101,7 +101,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
         ])
 
         if generate_mask:
-            input_path = os.path.join(in_path, in_image.originalFilename)
+            input_path = os.path.join(in_path, str(in_image.id) + "." + in_image.originalFilename.rsplit(".", 1)[1])
             mask = slices_to_mask(points, io.imread(input_path).shape)
             tifffile.imsave(os.path.join(out_path, "{}.tif".format(in_image.id)), mask)
     else:
