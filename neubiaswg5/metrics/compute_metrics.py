@@ -300,9 +300,18 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         os.mkdir(ctc_gt_seg)
         os.mkdir(ctc_gt_tra)
         os.mkdir(ctc_res_folder)
-        img_to_seq(reffile, ctc_gt_seg, "man_seg")
-        img_to_seq(reffile, ctc_gt_tra, "man_track")
-        img_to_seq(infile, ctc_res_folder, "mask")
+
+        # Read metadata from reference image (OME-TIFF)
+        img = tiff.TiffFile(reffile)
+        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
+        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
+        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
+        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+
+        # Convert image stack to image sequence (1 image per time point)
+        img_to_seq(reffile, ctc_gt_seg, "man_seg",X,Y,Z,T)
+        img_to_seq(reffile, ctc_gt_tra, "man_track",X,Y,Z,T)
+        img_to_seq(infile, ctc_res_folder, "mask",X,Y,Z,T)
 
         # Copy the track text files into the created folders
         ref_txt_file = reffile[:reffile.find('.')]+".txt"
@@ -312,8 +321,10 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Run the evaluation routines
         measure_fname = os.path.join(tmpfolder, "measures.txt")
-        os.system("SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
-        os.system("TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        #os.system("SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        #os.system("TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        os.system("/usr/bin/SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        os.system("/usr/bin/TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
 
         #Parse the output file with the measured scores
         with open(measure_fname, "r") as f:
