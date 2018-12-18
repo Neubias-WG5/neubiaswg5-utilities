@@ -35,6 +35,7 @@ from scipy import ndimage
 import tifffile as tiff
 from scipy.spatial import cKDTree
 from neubiaswg5 import *
+from neubiaswg5 import CLASS_LNDDET
 from .img_to_xml import *
 from .img_to_seq import *
 from .skl2obj import *
@@ -220,7 +221,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
         params_dict["GATING_DIST"] = gating_dist
 
-    elif problemclass == "LndDet":
+    elif problemclass == CLASS_LNDDET:
 
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
