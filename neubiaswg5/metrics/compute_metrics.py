@@ -15,6 +15,7 @@
 # "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), same as above (0 pixels ignored)
 # "TreTrc"      Filament tracing (trees), we consider including DIADEM metric but that requires to convert skeletons (workflow outputs) to SWC format
 # "LooTrc"      Filament tracing (loopy networks)
+# "LndDet"      Landmark detection (landmark true positive rate, landmark false detection rate), 2D/3D class masks with 0 background, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF)
 # "ObjDet"      Object detection matching (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), not working yet
 # "PrtTrk"      Particle (point) tracking (Particle Tracking Challenge metric), maximum linking distance set to a fixed value
 # "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), for object divisions requires an extra text file encoding division locations
@@ -31,7 +32,7 @@ from sklearn.metrics import confusion_matrix
 import numpy as np
 from scipy import ndimage
 import tifffile as tiff
-
+from scipy.spatial import cKDTree
 from neubiaswg5 import *
 from .img_to_xml import *
 from .img_to_seq import *
