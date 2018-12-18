@@ -1,24 +1,24 @@
-# Usage:            ComputeMetrics infile reffile problemclass tmpfolder
-# infile:           Worflow output image
+# Usage:            ComputeMetrics infile reffile problemclass tmpfolder (extra_params)
+# infile:           Worflow output image (prediction)
 # reffile:     	    Reference images (ground truth)
 # problemclass:     Problem class (6 character string, see below)
 # tmpfolder:        A temporary folder required for some metric computation
-
+# extra_params:     A list of possible extra parameters required by some of the metrics (passed as extra arguments)
 #
 # Returns:
 #  metrics_dict: mapping metrics name with their value
 #  params_dict: mapping metric parameters with their value
 #
 # problemclass:
-# "ObjSeg"      Object segmentation (DICE, AVD), work with binary or label 2D/3D masks images (regular multipage tif / OME-tif)
-# "SptCnt"      Spot counting (Normalized spot count difference), same as above
-# "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), same as above (0 pixels ignored)
-# "TreTrc"      Filament tracing (trees), we consider including DIADEM metric but that requires to convert skeletons (workflow outputs) to SWC format
-# "LooTrc"      Filament tracing (loopy networks)
+# "ObjSeg"      Object segmentation (DICE, AVD), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
+# "SptCnt"      Spot counting (Normalized spot count difference), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
+# "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), 2D/3D class masks with 0 background (regular multipage TIFF or OME-TIFF)
+# "TreTrc"      Filament trees tracing (unmatched skeleton voxel rate), 3D skeleton masks (regular multipage TIFF or OME-TIFF) - could be updated to SWC input + DIADEM metric
+# "LooTrc"      Filament networks tracing (unmatched skeleton voxel rate + NetMets metric), 3D skeleton masks (regular multipage TIFF or OME-TIFF)
 # "LndDet"      Landmark detection (landmark true positive rate, landmark false detection rate), 2D/3D class masks with 0 background, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF)
-# "ObjDet"      Object detection matching (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), not working yet
-# "PrtTrk"      Particle (point) tracking (Particle Tracking Challenge metric), maximum linking distance set to a fixed value
-# "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), for object divisions requires an extra text file encoding division locations
+# "ObjDet"      Object detection (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), 2D/3D binary masks, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
+# "PrtTrk"      Particle tracking (Particle Tracking Challenge metric), label masks with track IDs, exactly 1 pixel / particle (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
+# "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), label masks with track IDs (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF) + object divisions text files
 
 import re
 import shutil
