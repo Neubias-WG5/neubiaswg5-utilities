@@ -20,6 +20,7 @@
 # "PrtTrk"      Particle tracking (Particle Tracking Challenge metric), label masks with track IDs, exactly 1 pixel / particle (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
 # "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), label masks with track IDs (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF) + object divisions text files
 
+import os
 import re
 import shutil
 import sys
