@@ -256,13 +256,24 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         
     elif problemclass == CLASS_PRTTRK:
 
+        # Read metadata from reference image (OME-TIFF)
+        img = tiff.TiffFile(reffile)
+        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
+        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
+        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
+        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+
+        # Convert non null pixels coordinates to track files
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
-        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), True)
+        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile,X,Y,Z,T), True)
         in_xml_fname = os.path.join(tmpfolder, "intracks.xml")
-        tracks_to_xml(in_xml_fname, img_to_tracks(infile), True)
+        tracks_to_xml(in_xml_fname, img_to_tracks(infile,X,Y,Z,T), True)
         res_fname = in_xml_fname + ".score.txt"
+
+        # Call tracking metric code
+        gating_dist = extra_params.get("gating_dist", 5)
         # the fourth parameter represents the gating distance
-        gating_dist = extra_params.get("gating_dist", '')
+        #os.system('java -jar bin/win/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
         os.system('java -jar /usr/bin/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
 
         # Parse the output file created automatically in tmpfolder
