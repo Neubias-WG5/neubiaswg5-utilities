@@ -191,19 +191,30 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     elif problemclass == CLASS_OBJDET:
 
+        # Read metadata from reference image (OME-TIFF)
+        img = tiff.TiffFile(reffile)
+        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
+        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
+        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
+        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+
+        # Convert non null pixels coordinates to track files (single time point)
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
-        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), False)
+        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile,X,Y,Z,T), False)
         in_xml_fname = os.path.join(tmpfolder, "intracks.xml")
-        tracks_to_xml(in_xml_fname, img_to_tracks(infile), False)
+        tracks_to_xml(in_xml_fname, img_to_tracks(infile,X,Y,Z,T), False)
+
+        # Call point matching metric code
         # the third parameter represents the gating distance
         gating_dist = extra_params.get("gating_dist", 5)
+        #os.system('java -jar bin/win/DetectionPerformance.jar ' + ref_xml_fname + ' ' + in_xml_fname + ' ' + str(gating_dist))
         os.system('java -jar /usr/bin/DetectionPerformance.jar ' + ref_xml_fname + ' ' + in_xml_fname + ' ' + str(gating_dist))
 
         # Parse *.score.txt file created automatically in tmpfolder
         with open(in_xml_fname+".score.txt", "r") as f:
             bchmetrics = [line.split(':')[1].strip() for line in f.readlines()]
 
-        metric_names = ["TRUE_POS", "FALSE_NEG", "FALSE_POS", "RECALL", "PRECISIOM", "F1_SCORE", "RMSE"]
+        metric_names = ["TRUE_POS", "FALSE_NEG", "FALSE_POS", "RECALL", "PRECISION", "F1_SCORE", "RMSE"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
         params_dict["GATING_DIST"] = gating_dist
 
