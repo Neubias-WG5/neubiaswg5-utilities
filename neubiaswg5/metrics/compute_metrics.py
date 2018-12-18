@@ -35,7 +35,8 @@ import tifffile as tiff
 from neubiaswg5 import *
 from .img_to_xml import *
 from .img_to_seq import *
-
+from .skl2obj import *
+from .netmets_obj import netmets_obj
 
 def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, verbose=True, **extra_params):
     """Runs compute metrics for all pairs of in and ref files.
@@ -156,22 +157,37 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         Pred_Data = Pred_ImFile.asarray()
         True_ImFile = tiff.TiffFile(reffile)
         True_Data = True_ImFile.asarray()
+
+        # First metric is the rate of unmatched voxels between both trees (at a distance > gating_dist)
         Dst1 = ndimage.distance_transform_edt(Pred_Data==0)
         Dst2 = ndimage.distance_transform_edt(True_Data==0)
         indx = np.nonzero(np.logical_or(Pred_Data,True_Data))
         Dst1_onskl = Dst1[indx]
         Dst2_onskl = Dst2[indx]
+        # the third parameter represents the gating distance
         gating_dist = extra_params.get("gating_dist", 5)
+        unmatched_voxel_rate = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
 
-        metrics_dict["UNMATCHED_VOXEL_RATE"] = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
+        metrics_dict["UNMATCHED_VOXEL_RATE"] = unmatched_voxel_rate
         params_dict["GATING_DIST"] = gating_dist
 
-        #Msk1 = dilation(Pred_Data, ball(5))
-        #Msk2 = dilation(True_Data, ball(5))
-        #Msk1 = np.array(Msk1).ravel()
-        #Msk2 = np.array(Msk2).ravel()
-        #dildice = 2*sum(Msk1&Msk2)/(sum(Msk1)+sum(Msk2))
-        #bchmetrics = [dildice]
+        pixel_smp = 3           # Skeleton sampling step is set to 3 to ensure accurate reconstruction
+        ZRatio = 1              # Assumed equal to 1 in BIAFLOWS
+        sigma = gating_dist     # NetMets sigma is set to gating_dist since both concepts are related
+        subdiv = 4              # Set to default value
+
+        # Convert skeleton masks to OBJ files
+        skl2obj(True_Data,pixel_smp,ZRatio,os.path.join(tmpfolder, "GT.obj"))
+        skl2obj(Pred_Data,pixel_smp,ZRatio,os.path.join(tmpfolder, "Pred.obj"))
+
+        # Call NetMets on OBJ files
+        metres = netmets_obj(os.path.join(tmpfolder, "GT.obj"),os.path.join(tmpfolder, "Pred.obj"),sigma,subdiv)
+
+        metrics_dict["FNR"] = metres['FNR']
+        metrics_dict["FPR"] = metres['FPR']
+        params_dict['pixel sampling'] = pixel_smp
+        params_dict['sigma'] = sigma
+        params_dict['subdiv'] = subdiv
 
     elif problemclass == CLASS_OBJDET:
 
