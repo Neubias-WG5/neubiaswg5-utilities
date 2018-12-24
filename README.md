@@ -41,6 +41,49 @@ chmod +x bin/*
 cp bin/* /usr/bin/
 ```
 
+## `neubias.helpers`
+
+This sections documents the three helper functions `prepare_data`, `upload_data` and `upload_metrics`.
+
+In general, the parameter `problemclass` should one of the following constants (see `neubiaswg5/problemclass.py`):
+
+* `CLASS_OBJSEG`: object segmentation
+* `CLASS_SPTCNT`: spot count
+* `CLASS_PIXCLA`: pixel classification
+* `CLASS_TRETRC`: tree network tracing
+* `CLASS_LOOTRC`: loopy network tracing
+* `CLASS_OBJDET`: object detection
+* `CLASS_PRTTRK`: particle tracking
+* `CLASS_OBJTRK`: object tracking
+* `CLASS_LNDDET`: landmark detection
+
+### Prepare data
+
+This functions sets up the execution environment of a workflow by creating necessary folders and by downloading the
+input data, or simply checking that this data is already present in the expected folder.
+
+Parameters:
+
+* `problemclass` (type: `str`): the problem class of the workflow for which the env must be setup.
+* `nj` (type: `CytomineJob|NeubiasJob`): a CytomineJob or NeubiasJob instance.
+* `gt_suffix` (type: `str`): ground truth images suffix in the Neubias project.
+* `base_path` (type: `str|None`): base path for data download. Defaults to the `$HOME/{nj.job.id}/`.
+* `do_download` (type: `bool`): true if data should be downloaded from a BIAFLOWS instance.
+* `infolder` (type: `str|None`): full path of the folder for input data. If None, defaults to `{base_path}/in`.
+* `outfolder` (type: `str|None`): full path of the folder for output data. If None, defaults to `{base_path}/out`.
+* `gtfolder` (type: `str|None`): full path of the folder for ground truth data. If None, defaults to `{base_path}/ground_truth`.
+* `tmp_folder` (type: `str`): name (not the path) for temporary data folder.
+* `is_2d` (type: `bool`): True if the problem is a 2d one, False otherwise (3D, 4D, 3D+t).
+* `kwargs` (type: `dict`): additional problem class-specific parameters (see sections below).
+
+For `CLASS_TRETRC`:
+
+* `suffix` (type: `str`): suffix in the filename for attached files (by default `_attached`).
+
+### Upload data
+
+
+
 ## `neubiaswg5.exporter`
 
 Annotation export tools.
