@@ -171,8 +171,10 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     Returns
     -------
     in_data: list
-        List of input data. Can be a list of ImageInstance, ImageGroup, strings...
-        If nodownload is true, simply a list of absolute path to the input images.
+        List of input data. If `is_2d` then usually a list of `ImageInstance`, otherwise a list of `ImageGroup`.
+        If `--nodownload` (i.e. `do_download` is True) was used, then usually a list of absolute path to the input
+        images. For CLASS_TRETRC, a list of tuple containing the input as first item and attached file path as second
+        item.
     gt_images: list
         List of input data. Can be a list of ImageInstance, ImageGroup,...
         If nodownload is true, simply a list of absolute path to the ground truth images (in the same order as

@@ -62,6 +62,11 @@ In general, the parameter `problemclass` should one of the following constants (
 This functions sets up the execution environment of a workflow by creating necessary folders and by downloading the
 input data, or simply checking that this data is already present in the expected folder.
 
+The data is returned in a format that depends on the problem class, the dimensionality of the problem and whether or not
+the dataset is downloaded from a BIAFLOWS instance. In general, input (or ground truth) images will be returned as
+Cytomine models if the dataset is downloaded. Otherwise (if `--nodownload` was used), their absolute path is returned
+as string. See below for more details.
+
 Parameters:
 
 * `problemclass` (type: `str`): the problem class of the workflow for which the env must be setup.
@@ -75,13 +80,16 @@ Parameters:
 * `tmp_folder` (type: `str`): name (not the path) for temporary data folder.
 * `is_2d` (type: `bool`): True if the problem is a 2d one, False otherwise (3D, 4D, 3D+t).
 * `kwargs` (type: `dict`): additional problem class-specific parameters (see sections below).
+  * [`CLASS_TRETRC`] `suffix` (type: `str`): suffix in the filename for attached files (by default `_attached`).
 
-For `CLASS_TRETRC`:
+Returns:
 
-* `suffix` (type: `str`): suffix in the filename for attached files (by default `_attached`).
-
-### Upload data
-
+* `in_data` (type: `list`): list of input data. If `is_2d` then usually a list of `ImageInstance`, otherwise a list of `ImageGroup`. If `--nodownload` (i.e. `do_download` is True) was used, then usually a list of absolute path to the input images. For CLASS_TRETRC, a list of tuple containing the input as first item and attached file path as second item.
+* `gt_images` (type: `list`): list of ground truth data (same format as `in_data`).
+* `in_path` (type: `str`): full path to input data folder.
+* `gt_path` (type: `str`): full path to ground truth data folder.
+* `out_path` (type: `str`): full path to output data folder.
+* `tmp_path` (type: `str`): full path to tmp data folder.
 
 
 ## `neubiaswg5.exporter`
