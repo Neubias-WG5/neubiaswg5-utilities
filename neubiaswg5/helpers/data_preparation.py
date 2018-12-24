@@ -1,8 +1,9 @@
 import os
+import shutil
 from pathlib import Path
 
 from cytomine import CytomineJob
-from cytomine.models import ImageInstanceCollection, ImageGroupCollection
+from cytomine.models import ImageInstanceCollection, ImageGroupCollection, AttachedFileCollection, AttachedFile
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_LOOTRC, CLASS_TRETRC
 from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists
@@ -23,6 +24,20 @@ def get_image_name(image, is_2d=True):
         return image.originalFilename
     else:
         return image.name
+
+
+def get_file_extension(path):
+    """Return the extension of the file (with .) for the given path. If there is no extension returns an empty string"""
+    filename = os.path.basename(path)
+    if "." not in filename:
+        return ""
+    else:
+        return ".{}".format(filename.rsplit(".", 1)[-1])
+
+
+def get_file_name(path):
+    """Return the filename without extension"""
+    return os.path.basename(path).rsplit(".", 1)[0]
 
 
 def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
@@ -79,6 +94,39 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
     return in_images, gt_images
 
 
+def download_attached(inputs, path, suffix="_attached", do_download=False):
+    """
+    Download the most recent attached file for each input.
+    If do_download is False, then the attached file must have the same name (without extension) as the corresponding
+    input file plus the suffix.
+    """
+    new_inputs = list()
+
+    # if do_download is False, need to scan for existing attached files
+    existing_files = {get_file_name(f) for f in os.listdir(path) if suffix in f}
+    existing_extensions = {get_file_name(f): get_file_extension(f) for f in os.listdir(path) if suffix in f}
+
+    # get path for all inputs
+    for image in inputs:
+        if do_download:
+            # extract most recent file
+            files = AttachedFileCollection(image).fetch()
+            current_file = sorted(files.data(), key=lambda f: int(f.created), reverse=True)[0]
+
+            # download the last file
+            extension = get_file_extension(current_file.filename)
+            attached_path = os.path.join(path, "{}{}{}".format(image.id, suffix, extension))
+            current_file.download(attached_path)
+        else:
+            image_name = os.path.basename(image).rsplit(".")[0]
+            attached_name = "{}".format(image_name, suffix)
+            if attached_name not in existing_files:
+                raise FileNotFoundError("Missing attached file for input image '{}'.".format(image))
+            attached_path = os.path.join(path, "{}{}".format(attached_name, existing_extensions[attached_name]))
+        new_inputs.append((image, attached_path))
+    return new_inputs
+
+
 def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
                  outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, **kwargs):
     """Prepare data from parameters.
@@ -117,7 +165,9 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
         Name (not the path) for temporary data folder.
     is_2d: bool
         True if the problem is a 2d one, False otherwise (3D, 4D, 3D+t).
-
+    kwargs: dict
+        For CLASS_TRETRC:
+            - suffix: suffix in the filename for attached files (by default "_attached")
     Returns
     -------
     in_data: list
@@ -154,7 +204,11 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix, do_download=do_download)
 
     # download additional data
-    if problemclass == CLASS_TRETRC or problemclass == CLASS_LOOTRC or problemclass == CLASS_OBJTRK:
+    if problemclass == CLASS_TRETRC:
+        suffix = kwargs.get("suffix", "_attached")
+        in_data = download_attached(in_data, in_path, suffix=suffix, do_download=do_download)
+        gt_data = download_attached(gt_data, gt_path, suffix=suffix, do_download=do_download)
+    elif problemclass == CLASS_OBJTRK:
         raise NotImplementedError("Problemclass '{}' needs additional data. Download of this "
                                   "data hasn't been implemented yet".format(problemclass))
 
