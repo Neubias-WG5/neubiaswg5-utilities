@@ -1,24 +1,26 @@
-# Usage:            ComputeMetrics infile reffile problemclass tmpfolder
-# infile:           Worflow output image
+# Usage:            ComputeMetrics infile reffile problemclass tmpfolder (extra_params)
+# infile:           Worflow output image (prediction)
 # reffile:     	    Reference images (ground truth)
 # problemclass:     Problem class (6 character string, see below)
 # tmpfolder:        A temporary folder required for some metric computation
-
+# extra_params:     A list of possible extra parameters required by some of the metrics (passed as extra arguments)
 #
 # Returns:
 #  metrics_dict: mapping metrics name with their value
 #  params_dict: mapping metric parameters with their value
 #
 # problemclass:
-# "ObjSeg"      Object segmentation (DICE, AVD), work with binary or label 2D/3D masks images (regular multipage tif / OME-tif)
-# "SptCnt"      Spot counting (Normalized spot count difference), same as above
-# "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), same as above (0 pixels ignored)
-# "TreTrc"      Filament tracing (trees), we consider including DIADEM metric but that requires to convert skeletons (workflow outputs) to SWC format
-# "LooTrc"      Filament tracing (loopy networks)
-# "ObjDet"      Object detection matching (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), not working yet
-# "PrtTrk"      Particle (point) tracking (Particle Tracking Challenge metric), maximum linking distance set to a fixed value
-# "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), for object divisions requires an extra text file encoding division locations
+# "ObjSeg"      Object segmentation (DICE, AVD), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
+# "SptCnt"      Spot counting (Normalized spot count difference), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
+# "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), 2D/3D class masks with 0 background (regular multipage TIFF or OME-TIFF)
+# "TreTrc"      Filament trees tracing (unmatched skeleton voxel rate), 3D skeleton masks (regular multipage TIFF or OME-TIFF) - could be updated to SWC input + DIADEM metric
+# "LooTrc"      Filament networks tracing (unmatched skeleton voxel rate + NetMets metric), 3D skeleton masks (regular multipage TIFF or OME-TIFF)
+# "LndDet"      Landmark detection (landmark true positive rate, landmark false detection rate), 2D/3D class masks with 0 background, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF)
+# "ObjDet"      Object detection (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), 2D/3D binary masks, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
+# "PrtTrk"      Particle tracking (Particle Tracking Challenge metric), label masks with track IDs, exactly 1 pixel / particle (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
+# "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), label masks with track IDs (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF) + object divisions text files
 
+import os
 import re
 import shutil
 import sys
@@ -31,11 +33,13 @@ from sklearn.metrics import confusion_matrix
 import numpy as np
 from scipy import ndimage
 import tifffile as tiff
-
+from scipy.spatial import cKDTree
 from neubiaswg5 import *
+from neubiaswg5 import CLASS_LNDDET
 from .img_to_xml import *
 from .img_to_seq import *
-
+from .skl2obj import *
+from .netmets_obj import netmets_obj
 
 def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, verbose=True, **extra_params):
     """Runs compute metrics for all pairs of in and ref files.
@@ -156,50 +160,122 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         Pred_Data = Pred_ImFile.asarray()
         True_ImFile = tiff.TiffFile(reffile)
         True_Data = True_ImFile.asarray()
+
+        # First metric is the rate of unmatched voxels between both trees (at a distance > gating_dist)
         Dst1 = ndimage.distance_transform_edt(Pred_Data==0)
         Dst2 = ndimage.distance_transform_edt(True_Data==0)
         indx = np.nonzero(np.logical_or(Pred_Data,True_Data))
         Dst1_onskl = Dst1[indx]
         Dst2_onskl = Dst2[indx]
+        # the third parameter represents the gating distance
         gating_dist = extra_params.get("gating_dist", 5)
+        unmatched_voxel_rate = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
 
-        metrics_dict["UNMATCHED_VOXEL_RATE"] = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
+        metrics_dict["UNMATCHED_VOXEL_RATE"] = unmatched_voxel_rate
         params_dict["GATING_DIST"] = gating_dist
 
-        #Msk1 = dilation(Pred_Data, ball(5))
-        #Msk2 = dilation(True_Data, ball(5))
-        #Msk1 = np.array(Msk1).ravel()
-        #Msk2 = np.array(Msk2).ravel()
-        #dildice = 2*sum(Msk1&Msk2)/(sum(Msk1)+sum(Msk2))
-        #bchmetrics = [dildice]
+        pixel_smp = 3           # Skeleton sampling step is set to 3 to ensure accurate reconstruction
+        ZRatio = 1              # Assumed equal to 1 in BIAFLOWS
+        sigma = gating_dist     # NetMets sigma is set to gating_dist since both concepts are related
+        subdiv = 4              # Set to default value
+
+        # Convert skeleton masks to OBJ files
+        skl2obj(True_Data,pixel_smp,ZRatio,os.path.join(tmpfolder, "GT.obj"))
+        skl2obj(Pred_Data,pixel_smp,ZRatio,os.path.join(tmpfolder, "Pred.obj"))
+
+        # Call NetMets on OBJ files
+        metres = netmets_obj(os.path.join(tmpfolder, "GT.obj"),os.path.join(tmpfolder, "Pred.obj"),sigma,subdiv)
+
+        metrics_dict["FNR"] = metres['FNR']
+        metrics_dict["FPR"] = metres['FPR']
+        params_dict['pixel sampling'] = pixel_smp
+        params_dict['sigma'] = sigma
+        params_dict['subdiv'] = subdiv
 
     elif problemclass == CLASS_OBJDET:
 
+        # Read metadata from reference image (OME-TIFF)
+        img = tiff.TiffFile(reffile)
+        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
+        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
+        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
+        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+
+        # Convert non null pixels coordinates to track files (single time point)
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
-        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), False)
+        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile,X,Y,Z,T), False)
         in_xml_fname = os.path.join(tmpfolder, "intracks.xml")
-        tracks_to_xml(in_xml_fname, img_to_tracks(infile), False)
+        tracks_to_xml(in_xml_fname, img_to_tracks(infile,X,Y,Z,T), False)
+
+        # Call point matching metric code
         # the third parameter represents the gating distance
         gating_dist = extra_params.get("gating_dist", 5)
+        #os.system('java -jar bin/win/DetectionPerformance.jar ' + ref_xml_fname + ' ' + in_xml_fname + ' ' + str(gating_dist))
         os.system('java -jar /usr/bin/DetectionPerformance.jar ' + ref_xml_fname + ' ' + in_xml_fname + ' ' + str(gating_dist))
 
         # Parse *.score.txt file created automatically in tmpfolder
         with open(in_xml_fname+".score.txt", "r") as f:
             bchmetrics = [line.split(':')[1].strip() for line in f.readlines()]
 
-        metric_names = ["TRUE_POS", "FALSE_NEG", "FALSE_POS", "RECALL", "PRECISIOM", "F1_SCORE", "RMSE"]
+        metric_names = ["TRUE_POS", "FALSE_NEG", "FALSE_POS", "RECALL", "PRECISION", "F1_SCORE", "RMSE"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
         params_dict["GATING_DIST"] = gating_dist
 
+    elif problemclass == CLASS_LNDDET:
+
+        Pred_ImFile = tiff.TiffFile(infile)
+        Pred_Data = Pred_ImFile.asarray()
+        True_ImFile = tiff.TiffFile(reffile)
+        True_Data = True_ImFile.asarray()
+
+        # Initialize metrics arrays
+        maxlbl = np.maximum(np.amax(True_Data),np.amax(Pred_Data))
+        N_REF_LNDMRK = np.array([maxlbl,1])
+        N_PRED_LNDMRK = np.array([maxlbl,1])
+        RATE_MISSEDREF = np.array([maxlbl,1],dtype='float')
+        RATE_FALSEPRED = np.array([maxlbl,1],dtype='float')
+
+        # Per class loop
+        gating_dist = 5
+        if extra_params is not None: gating_dist = extra_params[0]
+        for i in range(maxlbl):
+            coords_True = np.argwhere(True_Data == (i+1))
+            coords_Pred = np.argwhere(Pred_Data == (i+1))
+            min_dists, min_dist_idx = cKDTree(coords_Pred).query(coords_True, 1)
+            matched_true = np.count_nonzero(min_dists < gating_dist)
+            min_dists, min_dist_idx = cKDTree(coords_True).query(coords_Pred, 1)
+            matched_pred = np.count_nonzero(min_dists < gating_dist)
+            N_REF_LNDMRK[i] = coords_True.shape[0]
+            N_PRED_LNDMRK[i] = coords_Pred.shape[0]
+            RATE_MISSEDREF[i] = float(matched_true)/N_REF_LNDMRK[i]
+            RATE_FALSEPRED[i] = (1.0-float(matched_pred)/N_PRED_LNDMRK[i])
+
+        metrics_dict['N_REF_LNDMRK'] = N_REF_LNDMRK
+        metrics_dict['N_PRED_LNDMRK'] = N_PRED_LNDMRK
+        metrics_dict['RATE_MISSEDREF'] = RATE_MISSEDREF
+        metrics_dict['RATE_FALSEPRED'] = RATE_FALSEPRED
+        params_dict["GATING_DIST"] = gating_dist        
+        
     elif problemclass == CLASS_PRTTRK:
 
+        # Read metadata from reference image (OME-TIFF)
+        img = tiff.TiffFile(reffile)
+        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
+        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
+        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
+        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+
+        # Convert non null pixels coordinates to track files
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
-        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), True)
+        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile,X,Y,Z,T), True)
         in_xml_fname = os.path.join(tmpfolder, "intracks.xml")
-        tracks_to_xml(in_xml_fname, img_to_tracks(infile), True)
+        tracks_to_xml(in_xml_fname, img_to_tracks(infile,X,Y,Z,T), True)
         res_fname = in_xml_fname + ".score.txt"
+
+        # Call tracking metric code
+        gating_dist = extra_params.get("gating_dist", 5)
         # the fourth parameter represents the gating distance
-        gating_dist = extra_params.get("gating_dist", '')
+        #os.system('java -jar bin/win/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
         os.system('java -jar /usr/bin/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
 
         # Parse the output file created automatically in tmpfolder
@@ -226,9 +302,18 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         os.mkdir(ctc_gt_seg)
         os.mkdir(ctc_gt_tra)
         os.mkdir(ctc_res_folder)
-        img_to_seq(reffile, ctc_gt_seg, "man_seg")
-        img_to_seq(reffile, ctc_gt_tra, "man_track")
-        img_to_seq(infile, ctc_res_folder, "mask")
+
+        # Read metadata from reference image (OME-TIFF)
+        img = tiff.TiffFile(reffile)
+        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
+        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
+        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
+        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+
+        # Convert image stack to image sequence (1 image per time point)
+        img_to_seq(reffile, ctc_gt_seg, "man_seg",X,Y,Z,T)
+        img_to_seq(reffile, ctc_gt_tra, "man_track",X,Y,Z,T)
+        img_to_seq(infile, ctc_res_folder, "mask",X,Y,Z,T)
 
         # Copy the track text files into the created folders
         ref_txt_file = reffile[:reffile.find('.')]+".txt"
@@ -238,8 +323,10 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Run the evaluation routines
         measure_fname = os.path.join(tmpfolder, "measures.txt")
-        os.system("SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
-        os.system("TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        #os.system("SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        #os.system("TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        os.system("/usr/bin/SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
+        os.system("/usr/bin/TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
 
         #Parse the output file with the measured scores
         with open(measure_fname, "r") as f:
