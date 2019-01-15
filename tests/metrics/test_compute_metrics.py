@@ -41,103 +41,105 @@ class TestComputeMetrics(TestCase):
             return computemetrics_batch(infilenames, reffilenames, problemclass, tmpfolder, **extra_params)
 
     def testObjSeg(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_objseg_tiflbl",
             reffolder="imgs/ref_objseg_tiflbl",
             problemclass="ObjSeg"
         )
         self.assertIsInstance(results, dict)
         self.assertEqual(len(results), 2)
-        self.assertIn("DICE_COEFFICIENT", results)
-        self.assertIn("AVERAGE_HAUSDORFF_DISTANCE", results)
+        self.assertIn("DC", results)
+        self.assertIn("AHD", results)
 
     def testSptCnt(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_sptcnt",
             reffolder="imgs/ref_sptcnt",
             problemclass="SptCnt"
         )
         self.assertIsInstance(results, dict)
         self.assertEqual(len(results), 1)
-        self.assertIn("RELATIVE_ERROR_COUNT", results)
+        self.assertIn("REC", results)
 
     def testPixCla(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_pixcla",
             reffolder="imgs/ref_pixcla",
             problemclass="PixCla"
         )
         self.assertIsInstance(results, dict)
         self.assertEqual(len(results), 5)
-        self.assertIn("CONFUSION_MATRIX", results)
-        self.assertIn("F1_SCORE", results)
-        self.assertIn("ACCURACY", results)
-        self.assertIn("PRECISION", results)
-        self.assertIn("RECALL", results)
+        self.assertIn("TP", results)
+        self.assertIn("TN", results)
+        self.assertIn("FP", results)
+        self.assertIn("FN", results)
+        self.assertIn("F1", results)
+        self.assertIn("ACC", results)
+        self.assertIn("PR", results)
+        self.assertIn("RE", results)
 
     def testLooTrc(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_lootrc",
             reffolder="imgs/ref_lootrc",
             problemclass="LooTrc",
             gating_dist=5
         )
         self.assertIsInstance(results, dict)
-        self.assertEqual(len(results), 2)
-        self.assertIn("GATING_DIST", results)
-        self.assertIn("UNMATCHED_VOXEL_RATE", results)
+        self.assertEqual(len(results), 1)
+        self.assertIn("GATING_DIST", params)
+        self.assertIn("UVR", results)
 
     def testTreTrc(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_tretrc",
             reffolder="imgs/ref_tretrc",
             problemclass="TreTrc",
             gating_dist=5
         )
         self.assertIsInstance(results, dict)
-        self.assertEqual(len(results), 2)
-        self.assertIn("GATING_DIST", results)
-        self.assertIn("UNMATCHED_VOXEL_RATE", results)
+        self.assertEqual(len(results), 1)
+        self.assertIn("GATING_DIST", params)
+        self.assertIn("UVR", results)
 
     def testObjDet(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_objdet",
             reffolder="imgs/ref_objdet",
             problemclass="ObjDet",
             gating_dist=5
         )
         self.assertIsInstance(results, dict)
-        self.assertEqual(len(results), 8)
-        self.assertIn("GATING_DIST", results)
-        self.assertIn("TRUE_POS", results)
-        self.assertIn("FALSE_NEG", results)
-        self.assertIn("FALSE_POS", results)
-        self.assertIn("RECALL", results)
-        self.assertIn("PRECISIOM", results)
-        self.assertIn("F1_SCORE", results)
+        self.assertEqual(len(results), 7)
+        self.assertIn("GATING_DIST", params)
+        self.assertIn("TP", results)
+        self.assertIn("FN", results)
+        self.assertIn("FP", results)
+        self.assertIn("RE", results)
+        self.assertIn("PR", results)
+        self.assertIn("F1", results)
         self.assertIn("RMSE", results)
 
     def testPrtTrk(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_prttrk",
             reffolder="imgs/ref_prttrk",
             problemclass="PrtTrk",
             gating_dist=5
         )
         expected_metrics = [
-            "PAIRING_DST", "NORM_PAIRING_SCORE_ALPHA", "FULL_NORM_PAIRING_SCORE_BETA", "N_REF_TRACKS",  "N_CAND_TRACKS",
-            "JACCARD_SIMILARITY_TRACKS", "N_PAIRED_TRACKS", "N_MISSED_TRACKS", "N_SPURIOUS_TRACKS", "N_REF_DETECTIONS",
-            "N_CAND_DETECTIONS", "JACCARD_SIMILARITY_DET", "N_PAIRED_DETECTIONS", "N_MISSED_DETECTIONS",
-            "N_SPURIOUS_DETECTIONS"
+            "PD", "NDSA", "NFPSB", "NRT",  "NCT",
+            "JST", "NPT", "NMT", "NST", "NRD",
+            "NCD", "JSD", "NDP", "NMD", "NSD"
         ]
         self.assertIsInstance(results, dict)
-        self.assertEqual(len(results), 1 + len(expected_metrics))
-        self.assertIn("GATING_DIST", results)
+        self.assertEqual(len(results), len(expected_metrics))
+        self.assertIn("GATING_DIST", params)
         for exp_metric in expected_metrics:
             self.assertIn(exp_metric, results)
 
     def testObjTrk(self):
-        results = self._test_metric(
+        results, params = self._test_metric(
             infolder="imgs/in_objtrk",
             reffolder="imgs/ref_objtrk",
             problemclass="ObjTrk"
