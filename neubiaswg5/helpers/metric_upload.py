@@ -45,29 +45,26 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
          os.path.join(gt_path, filename))
         for filename in filenames
     ])
-    additional_properties["IMAGES"] = str([im.id if do_download else os.path.basename(im) for im in inputs])
-    results = computemetrics_batch(outfiles, reffiles, problemclass, tmp_path, **metric_params)
+    results, params = computemetrics_batch(outfiles, reffiles, problemclass, tmp_path, **metric_params)
 
     # effectively upload metrics
     project = Project().fetch(nj.project.id)
     metrics = MetricCollection().fetch_with_filter("discipline", project.discipline)
 
     metric_collection = get_metric_result_collection(inputs)
-
-
     for metric_name, values in results.items():
+        # check if metric is supposed to be computed for this problem class
         metric = metrics.find_by_attribute("shortName", metric_name)
         if metric is None:
             nj.logger.info("Skip metric '{}' because not listed as a metric of the problem class '{}'.".format(metric_name, problemclass))
             continue
-        for _input, metric_value in zip(inputs, values):
-            [ for ]
-            metric_collection.append(get_metric_result(_input, metric_id=metric.id, id_job=nj.job.id, value=metric_value,
-                                                       property=[]))
-
+        # create metric results
+        for i, _input in enumerate(inputs):
+            # skip parameters of metric
+            # properties = [
+            #     Property(key=param_name, value=param_values[i])
+            #     for param_name, param_values in params.items()
+            # ]
+            metric_result = get_metric_result(_input, metric_id=metric.id, id_job=nj.job.id, value=values[i])
+            metric_collection.append(metric_result)
     metric_collection.save()
-
-    for key, value in results.items():
-        Property(nj.job, key=key, value=str(value)).save()
-    for key, value in additional_properties.items():
-        Property(nj.job, key=key, value=str(value)).save()
