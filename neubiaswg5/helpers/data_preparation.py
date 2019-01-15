@@ -89,7 +89,7 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         related_name = get_image_name(gt_image, is_2d=is_2d).replace(gt_suffix, '')
         related_image = [i for i in in_images if related_name == get_image_name(i, is_2d=is_2d)]
         if len(related_image) == 1:
-            gt_image.download(os.path.join(gt_path, "{}.tif".format(related_image[0].id)))
+            gt_image.download(os.path.join(gt_path, "{}.tif".format(related_image[0].id)), parent=True)
 
     return in_images, gt_images
 
