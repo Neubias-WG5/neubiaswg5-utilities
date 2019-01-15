@@ -41,23 +41,25 @@ from .img_to_seq import *
 from .skl2obj import *
 from .netmets_obj import netmets_obj
 
+
 def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, verbose=True, **extra_params):
     """Runs compute metrics for all pairs of in and ref files.
     Metrics and parameters values are returned in a dictionary mapping the metrics and parameters names with
     a list of respective values (as many as pair of files).
     """
-    results = dict()
+    metric_results = dict()
+    param_results = dict()
     for infile, reffile in zip(infiles, refiles):
         metrics, params = computemetrics(infile, reffile, problemclass, tmpfolder, verbose=verbose, **extra_params)
 
         def extend_list_dict(all_dict, curr_dict):
             for metric_name, metric_value in curr_dict.items():
-                results[metric_name] = all_dict.get(metric_name, []) + [metric_value]
+                all_dict[metric_name] = all_dict.get(metric_name, []) + [metric_value]
 
-        extend_list_dict(results, metrics)
-        extend_list_dict(results, params)
+        extend_list_dict(metric_results, metrics)
+        extend_list_dict(param_results, params)
 
-    return results
+    return metric_results, param_results
 
 
 def computemetrics(infile, reffile, problemclass, tmpfolder, verbose=True, **extra_params):
