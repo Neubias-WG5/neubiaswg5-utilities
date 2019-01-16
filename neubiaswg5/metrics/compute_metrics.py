@@ -138,8 +138,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict["PRECISION"] = precision_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
         metrics_dict["RECALL"] = recall_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
 
-    elif problemclass == CLASS_TRETRC:
-
     elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)

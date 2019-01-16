@@ -113,7 +113,7 @@ class TestComputeMetrics(TestCase):
         self.assertIn("FALSE_NEG", results)
         self.assertIn("FALSE_POS", results)
         self.assertIn("RECALL", results)
-        self.assertIn("PRECISIOM", results)
+        self.assertIn("PRECISION", results)
         self.assertIn("F1_SCORE", results)
         self.assertIn("RMSE", results)
 
