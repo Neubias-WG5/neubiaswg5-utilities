@@ -53,7 +53,7 @@ def mask_to_points_3d(mask, time=False):
             label=label,
             time=None if not time else z,
             depth=None if time else z
-        ) for (y, x, z), label in zip(zip(*pixels), labels)
+        ) for (z, y, x), label in zip(zip(*pixels), labels)
     ]
 
 

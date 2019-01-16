@@ -13,7 +13,7 @@
 # "ObjSeg"      Object segmentation (DICE, AVD), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
 # "SptCnt"      Spot counting (Normalized spot count difference), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
 # "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), 2D/3D class masks with 0 background (regular multipage TIFF or OME-TIFF)
-# "TreTrc"      Filament trees tracing (unmatched skeleton voxel rate), 3D skeleton masks (regular multipage TIFF or OME-TIFF) - could be updated to SWC input + DIADEM metric
+# "TreTrc"      Filament tree tracing - tbc by call to DIADEM metric taking 2 SWC input files
 # "LooTrc"      Filament networks tracing (unmatched skeleton voxel rate + NetMets metric), 3D skeleton masks (regular multipage TIFF or OME-TIFF)
 # "LndDet"      Landmark detection (landmark true positive rate, landmark false detection rate), 2D/3D class masks with 0 background, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF)
 # "ObjDet"      Object detection (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), 2D/3D binary masks, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
@@ -140,20 +140,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     elif problemclass == CLASS_TRETRC:
 
-        Pred_ImFile = tiff.TiffFile(infile)
-        Pred_Data = Pred_ImFile.asarray()
-        True_ImFile = tiff.TiffFile(reffile)
-        True_Data = True_ImFile.asarray()
-        Dst1 = ndimage.distance_transform_edt(Pred_Data==0)
-        Dst2 = ndimage.distance_transform_edt(True_Data==0)
-        indx = np.nonzero(np.logical_or(Pred_Data,True_Data))
-        Dst1_onskl = Dst1[indx]
-        Dst2_onskl = Dst2[indx]
-        gating_dist = extra_params.get("gating_dist", 5)
-
-        metrics_dict["UNMATCHED_VOXEL_RATE"] = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
-        params_dict["GATING_DIST"] = gating_dist
-
     elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
@@ -232,8 +218,8 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         maxlbl = np.maximum(np.amax(True_Data),np.amax(Pred_Data))
         N_REF_LNDMRK = np.array([maxlbl,1])
         N_PRED_LNDMRK = np.array([maxlbl,1])
-        RATE_MISSEDREF = np.array([maxlbl,1],dtype='float')
-        RATE_FALSEPRED = np.array([maxlbl,1],dtype='float')
+        RATE_TRUEPOS = np.array([maxlbl,1],dtype='float')
+        RATE_FALSEPOS = np.array([maxlbl,1],dtype='float')
 
         # Per class loop
         gating_dist = 5
@@ -247,13 +233,13 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
             matched_pred = np.count_nonzero(min_dists < gating_dist)
             N_REF_LNDMRK[i] = coords_True.shape[0]
             N_PRED_LNDMRK[i] = coords_Pred.shape[0]
-            RATE_MISSEDREF[i] = float(matched_true)/N_REF_LNDMRK[i]
-            RATE_FALSEPRED[i] = (1.0-float(matched_pred)/N_PRED_LNDMRK[i])
+            RATE_TRUEPOS[i] = float(matched_true)/N_REF_LNDMRK[i]
+            RATE_FALSEPOS[i] = (1.0-float(matched_pred)/N_PRED_LNDMRK[i])
 
         metrics_dict['N_REF_LNDMRK'] = N_REF_LNDMRK
         metrics_dict['N_PRED_LNDMRK'] = N_PRED_LNDMRK
-        metrics_dict['RATE_MISSEDREF'] = RATE_MISSEDREF
-        metrics_dict['RATE_FALSEPRED'] = RATE_FALSEPRED
+        metrics_dict['RATE_TRUEPOS'] = RATE_TRUEPOS
+        metrics_dict['RATE_FALSEPOS'] = RATE_FALSEPOS
         params_dict["GATING_DIST"] = gating_dist        
         
     elif problemclass == CLASS_PRTTRK:

@@ -7,18 +7,21 @@ from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
 from tifffile import tifffile
 
-from neubiaswg5 import CLASS_OBJSEG, CLASS_SPTCNT, CLASS_OBJDET, CLASS_LOOTRC
+from neubiaswg5.problemclass import *
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
     slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
 from shapely.affinity import affine_transform
 
 
-def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_project):
-    polygon = affine_transform(slice.polygon, [1, 0, 0, -1, 0, image_height]).wkt
-    return Annotation(
-        location=polygon, id_image=id_image, id_project=id_project,
-        property=[{"key": "index", "value": str(slice.label)}]
-    )
+def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_project, label=None, upload_group_id=False):
+    parameters = {
+        "location": affine_transform(slice.polygon, [1, 0, 0, -1, 0, image_height]).wkt,
+        "id_image": id_image,
+        "id_project": id_project
+    }
+    if upload_group_id:
+        parameters["property"] = [{"key": "ANNOTATION_GROUP_ID", "value": slice.label if label is None else label}]
+    return Annotation(**parameters)
 
 
 def get_image_seq_info(image_group):
@@ -27,13 +30,15 @@ def get_image_seq_info(image_group):
     return {iseq.zStack: iseq.image for iseq in image_sequences}, height
 
 
-def extract_annotations_objseg(out_path, in_image, project_id, **kwargs):
+def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=False, **kwargs):
     """
     Parameters
     ----------
     out_path: str
     in_image: ImageInstance|ImageGroup
     project_id: int
+    upload_group_id: bool
+        True for uploading annotation group id
     kwargs: dict
     """
     file = "{}.tif".format(in_image.id)
@@ -52,15 +57,16 @@ def extract_annotations_objseg(out_path, in_image, project_id, **kwargs):
         collection.extend([
             annotation_from_slice(
                 slice=s, id_image=depth_to_image[s.depth],
-                image_height=height, id_project=project_id
-            ) for obj in slices for s in obj
+                image_height=height, id_project=project_id,
+                label=obj_id, upload_group_id=upload_group_id
+            ) for obj_id, obj in enumerate(slices) for s in obj
         ])
     else:
         raise ValueError("Only supports 2D or 3D output images...")
     return collection
 
 
-def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None, result_file_suffix="_results.txt", has_headers=False, parse_fn=None, **kwargs):
+def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None, result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, **kwargs):
     """
     Parameters:
     -----------
@@ -80,6 +86,8 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
         True if the csv contains some headers (ignored if is_csv is False)
     parse_fn: callable
         A function for extracting coordinates from the csv file (already separated) line.
+    upload_group_id: bool
+        True for uploading annotation group id
     kwargs: dict
     """
     file = str(in_image.id) + result_file_suffix
@@ -118,8 +126,9 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
             collection.extend([
                 annotation_from_slice(
                     slice=s, id_image=depth_to_image[s.depth],
-                    image_height=height, id_project=project_id
-                ) for obj in points for s in obj
+                    image_height=height, id_project=project_id,
+                    label=obj_id, upload_group_id=upload_group_id
+                ) for obj_id, obj in enumerate(points) for s in obj
             ])
 
     return collection
@@ -158,7 +167,7 @@ def extract_annotations_lootrc(out_path, in_image, project_id, **kwargs):
     return collection
 
 
-def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_download=False, do_export=False, **kwargs):
+def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_download=False, do_export=False, is_2d=True, **kwargs):
     """Upload annotations or any other related results to the server.
 
     Parameters
@@ -177,6 +186,8 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         True if data was downloaded
     do_export: bool
         True if results should be exported
+    is_2d: bool
+        True for 2D image, False for more than two dimensions.
     kwargs: dict
         Additional parameters for:
         * ObjDet/SptCnt: see function 'extract_annotations_objdet'
@@ -194,12 +205,15 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
     if problemclass == CLASS_LOOTRC:
         extract_fn = extract_annotations_lootrc
     else:
-        raise ValueError("Unknown problemclass '{}'.".format(problemclass))
+        raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
+
+    # whether or not to upload a unique identifier as a property with each detected object
+    upload_group_id = not is_2d or problemclass in {CLASS_OBJTRK, CLASS_PRTTRK}
 
     collection = AnnotationCollection()
     monitor_params["prefix"] = "Extract masks/points/... from output data"
     for image in nj.monitor(inputs, **monitor_params):
-        collection.extend(extract_fn(out_path, image, nj.project.id, **kwargs))
+        collection.extend(extract_fn(out_path, image, nj.project.id, upload_group_id=upload_group_id, **kwargs))
 
     nj.job.update(statusComment="Upload extracted annotations (total: {})".format(len(collection)))
     collection.save()
