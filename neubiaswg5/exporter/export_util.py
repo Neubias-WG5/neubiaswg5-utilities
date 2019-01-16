@@ -4,6 +4,17 @@ from PIL.ImageDraw import ImageDraw
 from shapely.geometry import Point
 
 
+def draw_linestring(image, linestring, color=255):
+    """Draw a linestring in the given color at the given location"""
+    pil_image = fromarray(image)
+    validated_color = color
+    draw = ImageDraw(pil_image)
+    if len(image.shape) > 2 and image.shape[2] > 1:
+        validated_color = tuple(color)
+    draw.line(linestring.coords, fill=validated_color)
+    return np.asarray(pil_image)
+
+
 def draw_poly(image, polygon, color=255):
     """Draw a polygon in the given color at the given location"""
     pil_image = fromarray(image)

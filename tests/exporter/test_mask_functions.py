@@ -5,6 +5,8 @@ import numpy as np
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d
 from shapely.geometry import Polygon, box, LineString
 
+from neubiaswg5.exporter.export_util import draw_linestring
+from neubiaswg5.exporter.skeleton_mask_to_objects import skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
 from tests.exporter.util import draw_square_by_corner, draw_poly
 
 
@@ -178,3 +180,36 @@ class TestMaskToObject3D(TestCase):
         self.assertEqual(slice2[0].label, 200)
         self.assertEqual(slice2[0].depth, 1)
         self.assertTrue(slice2[0].polygon.equals(box(40, 45, 65, 70)))
+
+
+class TestSkeletonMaskToObject(TestCase):
+    def testSkeletonMask2D(self):
+        image = np.zeros([40, 40], dtype=np.uint8)
+        image = draw_linestring(image, linestring=LineString([(5, 5), (18, 10), (30, 30), (5, 30)]))
+        image = draw_linestring(image, linestring=LineString([(5, 25), (25, 5)]))
+        slices = skeleton_mask_to_objects_2d(image)
+        self.assertEqual(1, len(slices))
+
+    def testSkeletonMask3D(self):
+        image = np.zeros([40, 40, 40], dtype=np.uint8)
+        image[20, :, :] = draw_linestring(image[20, :, :], LineString([(5, 5), (25, 25)]))
+        image[:, 25, :] = draw_linestring(image[:, 25, :], LineString([(5, 5), (25, 25)]), color=127)
+        image[:, :, 30] = draw_linestring(image[:, :, 30], LineString([(5, 5), (25, 25)]), color=63)
+        slices = skeleton_mask_to_objects_3d(image, assume_unique_labels=True)
+        self.assertEqual(3, len(slices))
+
+        slices = sorted(slices, key=lambda s: s[0].label)
+
+        self.assertEqual(5, len(slices[0]))
+        self.assertEqual(63, slices[0][0].label)
+        self.assertEqual(25, len(slices[1]))
+        self.assertEqual(127, slices[1][0].label)
+        self.assertEqual(25, len(slices[2]))
+        self.assertEqual(255, slices[2][0].label)
+
+    def testSkeletonMask3DProjection(self):
+        image = np.zeros([30, 30, 30], dtype=np.uint8)
+        image[:, :, 15] = draw_linestring(image[:, :, 15], LineString([(5, 5), (25, 25)]))
+        slices = skeleton_mask_to_objects_3d(image, assume_unique_labels=True, projection=3)
+        self.assertEqual(1, len(slices))
+        self.assertEqual(11, len(slices[0]))
