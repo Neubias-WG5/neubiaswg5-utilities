@@ -66,7 +66,8 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     return collection
 
 
-def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None, result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, **kwargs):
+def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None,
+                               result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, **kwargs):
     """
     Parameters:
     -----------
@@ -134,13 +135,14 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
     return collection
 
 
-def extract_annotations_lootrc(out_path, in_image, project_id, **kwargs):
+def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, **kwargs):
     """
     Parameters
     ----------
     out_path: str
     in_image: ImageInstance|ImageGroup
     project_id: int
+    upload_group_id: bool
     kwargs: dict
     """
     file = "{}.tif".format(in_image.id)
@@ -159,8 +161,9 @@ def extract_annotations_lootrc(out_path, in_image, project_id, **kwargs):
         collection.extend([
             annotation_from_slice(
                 slice=s, id_image=depth_to_image[s.depth],
-                image_height=height, id_project=project_id
-            ) for obj in slices for s in obj
+                image_height=height, id_project=project_id,
+                label=obj_id, upload_group_id=upload_group_id
+            ) for obj_id, obj in enumerate(slices) for s in obj
         ])
     else:
         raise ValueError("Only supports 2D or 3D output images...")
