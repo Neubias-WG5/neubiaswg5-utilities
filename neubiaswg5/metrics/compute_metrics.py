@@ -140,6 +140,8 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     elif problemclass == CLASS_TRETRC:
 
+        pass
+        
     elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
