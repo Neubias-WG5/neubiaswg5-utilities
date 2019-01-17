@@ -205,7 +205,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         extract_fn = extract_annotations_objseg
     elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT:
         extract_fn = extract_annotations_objdet
-    if problemclass == CLASS_LOOTRC:
+    elif problemclass == CLASS_LOOTRC:
         extract_fn = extract_annotations_lootrc
     else:
         raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
