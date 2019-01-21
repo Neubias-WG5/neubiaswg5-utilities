@@ -231,9 +231,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
             N_PRED[i] = coords_Pred.shape[0]
             MRE[i] = np.mean(min_dists)
 
-        metrics_dict['NREF'] = N_REF
-        metrics_dict['NPRED'] = N_PRED
-        metrics_dict['MRE'] = MRE
+        metrics_dict['NREF'] = np.sum(N_REF)
+        metrics_dict['NPRED'] = np.sum(N_PRED)
+        metrics_dict['MRE'] = np.mean(MRE)
         
     elif problemclass == CLASS_PRTTRK:
 
