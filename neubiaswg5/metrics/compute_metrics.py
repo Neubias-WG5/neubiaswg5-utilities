@@ -6,19 +6,19 @@
 # extra_params:     A list of possible extra parameters required by some of the metrics (passed as extra arguments)
 #
 # Returns:
-#  metrics_dict: mapping metrics name with their value
-#  params_dict: mapping metric parameters with their value
+#  metrics_dict: Metric entries
+#  params_dict: Metric parameters
 #
-# problemclass:
-# "ObjSeg"      Object segmentation (DICE, AVD), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
-# "SptCnt"      Spot counting (Normalized spot count difference), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
-# "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), 2D/3D class masks with 0 background (regular multipage TIFF or OME-TIFF)
-# "TreTrc"      Filament tree tracing - tbc by call to DIADEM metric taking 2 SWC input files
-# "LooTrc"      Filament networks tracing (unmatched skeleton voxel rate + NetMets metric), 3D skeleton masks (regular multipage TIFF or OME-TIFF)
-# "LndDet"      Landmark detection (landmark true positive rate, landmark false detection rate), 2D/3D class masks with 0 background, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF)
-# "ObjDet"      Object detection (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), 2D/3D binary masks, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
-# "PrtTrk"      Particle tracking (Particle Tracking Challenge metric), label masks with track IDs, exactly 1 pixel / particle (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
-# "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), label masks with track IDs (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF) + object divisions text files
+# problemclass (see Image formats, annotations encoding and reported metric document):
+# "ObjSeg"      Object segmentation
+# "SptCnt"      Spot counting
+# "ObjDet"      Object detection
+# "PixCla"    	Pixel classification
+# "TreTrc"      Filament tree tracing
+# "LooTrc"      Filament networks tracing
+# "LndDet"      Landmark detection
+# "PrtTrk"      Particle tracking
+# "ObjTrk"      Object tracking
 
 import os
 import re
