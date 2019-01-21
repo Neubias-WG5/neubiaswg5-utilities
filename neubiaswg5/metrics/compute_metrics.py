@@ -97,7 +97,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
             inds = [m.start() for m in re.finditer("value", data)]
             bchmetrics = [data[ind+7:data.find('"',ind+7)] for ind in inds]
 
-        metric_names = ["DICE_COEFFICIENT", "AVERAGE_HAUSDORFF_DISTANCE"]
+        metric_names = ["DC", "AHD"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
 
     elif problemclass == CLASS_SPTCNT:
@@ -112,7 +112,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         cnt_true = np.count_nonzero(y_true)
         bchmetrics = abs(cnt_pred-cnt_true)/cnt_true
 
-        metrics_dict["RELATIVE_ERROR_COUNT"] = bchmetrics
+        metrics_dict["REC"] = bchmetrics
 
     elif problemclass == CLASS_PIXCLA:
 
@@ -132,11 +132,11 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
                 y_true_cleaned.append(y_true[i]>0)
                 y_pred_cleaned.append(y_pred[i]>0)
 
-        metrics_dict["CONFUSION_MATRIX"] = confusion_matrix(y_true_cleaned, y_pred_cleaned)
-        metrics_dict["F1_SCORE"] = f1_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
-        metrics_dict["ACCURACY"] = accuracy_score(y_true_cleaned, y_pred_cleaned, normalize=True, sample_weight=None)
-        metrics_dict["PRECISION"] = precision_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
-        metrics_dict["RECALL"] = recall_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
+        #metrics_dict["CM"] = confusion_matrix(y_true_cleaned, y_pred_cleaned)
+        metrics_dict["F1"] = f1_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
+        metrics_dict["ACC"] = accuracy_score(y_true_cleaned, y_pred_cleaned, normalize=True, sample_weight=None)
+        metrics_dict["PR"] = precision_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
+        metrics_dict["RE"] = recall_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
 
     elif problemclass == CLASS_TRETRC:
 
@@ -159,7 +159,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         gating_dist = extra_params.get("gating_dist", 5)
         unmatched_voxel_rate = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
 
-        metrics_dict["UNMATCHED_VOXEL_RATE"] = unmatched_voxel_rate
+        metrics_dict["UVR"] = unmatched_voxel_rate
         params_dict["GATING_DIST"] = gating_dist
 
         pixel_smp = 3           # Skeleton sampling step is set to 3 to ensure accurate reconstruction
@@ -176,9 +176,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         metrics_dict["FNR"] = metres['FNR']
         metrics_dict["FPR"] = metres['FPR']
-        params_dict['pixel sampling'] = pixel_smp
-        params_dict['sigma'] = sigma
-        params_dict['subdiv'] = subdiv
+        params_dict['PIX_SMP'] = pixel_smp
+        params_dict['SIGMA'] = sigma
+        params_dict['SUBDIV'] = subdiv
 
     elif problemclass == CLASS_OBJDET:
 
@@ -205,7 +205,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         with open(in_xml_fname+".score.txt", "r") as f:
             bchmetrics = [line.split(':')[1].strip() for line in f.readlines()]
 
-        metric_names = ["TRUE_POS", "FALSE_NEG", "FALSE_POS", "RECALL", "PRECISION", "F1_SCORE", "RMSE"]
+        metric_names = ["TP", "FN", "FP", "RE", "PR", "F1", "RMSE"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
         params_dict["GATING_DIST"] = gating_dist
 
@@ -231,8 +231,8 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
             N_PRED[i] = coords_Pred.shape[0]
             MRE[i] = np.mean(min_dists)
 
-        metrics_dict['N_REF'] = N_REF
-        metrics_dict['N_PRED'] = N_PRED
+        metrics_dict['NREF'] = N_REF
+        metrics_dict['NPRED'] = N_PRED
         metrics_dict['MRE'] = MRE
         
     elif problemclass == CLASS_PRTTRK:
@@ -262,10 +262,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
             bchmetrics = [line.split(':')[0].strip() for line in f.readlines()]
 
         metric_names = [
-            "PAIRING_DST", "NORM_PAIRING_SCORE_ALPHA", "FULL_NORM_PAIRING_SCORE_BETA", "N_REF_TRACKS",  "N_CAND_TRACKS",
-            "JACCARD_SIMILARITY_TRACKS", "N_PAIRED_TRACKS", "N_MISSED_TRACKS", "N_SPURIOUS_TRACKS", "N_REF_DETECTIONS",
-            "N_CAND_DETECTIONS", "JACCARD_SIMILARITY_DET", "N_PAIRED_DETECTIONS", "N_MISSED_DETECTIONS",
-            "N_SPURIOUS_DETECTIONS"
+            "PD", "NPSA", "FNPSB", "NRT",  "NCT","JST", "NPT", "NMT", "NST", "NRD", "NCD", "JSD", "NPD", "NMD","NSD"
         ]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
         params_dict["GATING_DIST"] = gating_dist
