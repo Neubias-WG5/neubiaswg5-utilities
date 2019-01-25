@@ -1,3 +1,4 @@
+import logging
 import os
 
 from cytomine import CytomineJob
@@ -52,6 +53,7 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     metrics = MetricCollection().fetch_with_filter("discipline", project.discipline)
 
     metric_collection = get_metric_result_collection(inputs)
+    per_input_metrics = dict()
     for metric_name, values in results.items():
         # check if metric is supposed to be computed for this problem class
         metric = metrics.find_by_attribute("shortName", metric_name)
@@ -62,4 +64,17 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
         for i, _input in enumerate(inputs):
             metric_result = get_metric_result(_input, id_metric=metric.id, id_job=nj.job.id, value=values[i])
             metric_collection.append(metric_result)
+
+            # for logging
+            image_dict = per_input_metrics.get(_input.originalFilename, {})
+            image_dict[metric.shortName] = image_dict.get(metric.shortName, []) + [values[i]]
+            per_input_metrics[_input.originalFilename] = image_dict
+
     metric_collection.save()
+
+    nj.logger.log(logging.DEBUG, "Metrics:")
+    for _name, _metrics in per_input_metrics.items():
+        nj.logger.log(logging.DEBUG, "> {}: {}".format(
+            _name,
+            ", ".join(["{}:{}".format(m, v) for m, v in _metrics.items()])
+        ))
