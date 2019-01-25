@@ -8,6 +8,9 @@ class Metric(Model):
         self.shortName = shortName
         self.populate(attributes)
 
+    def __str__(self):
+        return self.name + " (" + self.shortName + ")"
+
 
 class MetricCollection(Collection):
     def __init__(self, filters=None, max=0, offset=0, **parameters):
@@ -24,6 +27,9 @@ class ImageInstanceMetricResult(Model):
         self.image = id_image
         self.value = value
         self.populate(attributes)
+
+    def __str__(self):
+        return "metric[{}] = {}".format(self.metric, self.value)
 
 
 class ImageInstanceMetricResultCollection(Collection):

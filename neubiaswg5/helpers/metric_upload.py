@@ -60,11 +60,6 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
             continue
         # create metric results
         for i, _input in enumerate(inputs):
-            # skip parameters of metric
-            # properties = [
-            #     Property(key=param_name, value=param_values[i])
-            #     for param_name, param_values in params.items()
-            # ]
-            metric_result = get_metric_result(_input, metric_id=metric.id, id_job=nj.job.id, value=values[i])
+            metric_result = get_metric_result(_input, id_metric=metric.id, id_job=nj.job.id, value=values[i])
             metric_collection.append(metric_result)
     metric_collection.save()
