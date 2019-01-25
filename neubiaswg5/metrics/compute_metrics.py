@@ -6,19 +6,19 @@
 # extra_params:     A list of possible extra parameters required by some of the metrics (passed as extra arguments)
 #
 # Returns:
-#  metrics_dict: mapping metrics name with their value
-#  params_dict: mapping metric parameters with their value
+#  metrics_dict: Metric entries
+#  params_dict: Metric parameters
 #
-# problemclass:
-# "ObjSeg"      Object segmentation (DICE, AVD), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
-# "SptCnt"      Spot counting (Normalized spot count difference), binary 2D/3D mask images (regular multipage TIFF or OME-TIFF)
-# "PixCla"    	Pixel classification (Confusion matrix, F1-score, accuracy, precision, recall), 2D/3D class masks with 0 background (regular multipage TIFF or OME-TIFF)
-# "TreTrc"      Filament trees tracing (unmatched skeleton voxel rate), 3D skeleton masks (regular multipage TIFF or OME-TIFF) - could be updated to SWC input + DIADEM metric
-# "LooTrc"      Filament networks tracing (unmatched skeleton voxel rate + NetMets metric), 3D skeleton masks (regular multipage TIFF or OME-TIFF)
-# "LndDet"      Landmark detection (landmark true positive rate, landmark false detection rate), 2D/3D class masks with 0 background, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF)
-# "ObjDet"      Object detection (TP, FN, FP, Recall, Precision, F1-score, RMSE over TP), 2D/3D binary masks, exactly 1 pixel / object (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
-# "PrtTrk"      Particle tracking (Particle Tracking Challenge metric), label masks with track IDs, exactly 1 pixel / particle (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF)
-# "ObjTrk"      Object tracking (Cell Tracking Challenge metrics), label masks with track IDs (regular multipage TIFF or OME-TIFF prediction, reference must be OME-TIFF) + object divisions text files
+# problemclass (see Image formats, annotations encoding and reported metric document):
+# "ObjSeg"      Object segmentation
+# "SptCnt"      Spot counting
+# "ObjDet"      Object detection
+# "PixCla"    	Pixel classification
+# "TreTrc"      Filament tree tracing
+# "LooTrc"      Filament networks tracing
+# "LndDet"      Landmark detection
+# "PrtTrk"      Particle tracking
+# "ObjTrk"      Object tracking
 
 import os
 import re
@@ -134,11 +134,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
                 y_true_cleaned.append(y_true[i]>0)
                 y_pred_cleaned.append(y_pred[i]>0)
 
-        matrix = confusion_matrix(y_true_cleaned, y_pred_cleaned)
-        metrics_dict["TP"] = matrix[1, 1]
-        metrics_dict["FP"] = matrix[0, 1]
-        metrics_dict["TN"] = matrix[0, 0]
-        metrics_dict["FN"] = matrix[1, 0]
+        #metrics_dict["CM"] = confusion_matrix(y_true_cleaned, y_pred_cleaned)
         metrics_dict["F1"] = f1_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
         metrics_dict["ACC"] = accuracy_score(y_true_cleaned, y_pred_cleaned, normalize=True, sample_weight=None)
         metrics_dict["PR"] = precision_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
@@ -146,19 +142,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     elif problemclass == CLASS_TRETRC:
 
-        Pred_ImFile = tiff.TiffFile(infile)
-        Pred_Data = Pred_ImFile.asarray()
-        True_ImFile = tiff.TiffFile(reffile)
-        True_Data = True_ImFile.asarray()
-        Dst1 = ndimage.distance_transform_edt(Pred_Data==0)
-        Dst2 = ndimage.distance_transform_edt(True_Data==0)
-        indx = np.nonzero(np.logical_or(Pred_Data,True_Data))
-        Dst1_onskl = Dst1[indx]
-        Dst2_onskl = Dst2[indx]
-        gating_dist = extra_params.get("gating_dist", 5)
-
-        metrics_dict["UVR"] = (sum(Dst1_onskl > gating_dist)+sum(Dst2_onskl > gating_dist))/(Dst1_onskl.size+Dst2_onskl.size)
-        params_dict["GATING_DIST"] = gating_dist
+        pass
 
     elif problemclass == CLASS_LOOTRC:
 
@@ -194,9 +178,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         metrics_dict["FNR"] = metres['FNR']
         metrics_dict["FPR"] = metres['FPR']
-        params_dict['pixel sampling'] = pixel_smp
-        params_dict['sigma'] = sigma
-        params_dict['subdiv'] = subdiv
+        params_dict['PIX_SMP'] = pixel_smp
+        params_dict['SIGMA'] = sigma
+        params_dict['SUBDIV'] = subdiv
 
     elif problemclass == CLASS_OBJDET:
 
@@ -236,31 +220,22 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Initialize metrics arrays
         maxlbl = np.maximum(np.amax(True_Data),np.amax(Pred_Data))
-        N_REF_LNDMRK = np.array([maxlbl,1])
-        N_PRED_LNDMRK = np.array([maxlbl,1])
-        RATE_TRUEPOS = np.array([maxlbl,1],dtype='float')
-        RATE_FALSEPOS = np.array([maxlbl,1],dtype='float')
+        N_REF = np.array([maxlbl,1])
+        N_PRED = np.array([maxlbl,1])
+        MRE = np.array([maxlbl,1],dtype='float')
 
         # Per class loop
-        gating_dist = 5
-        if extra_params is not None: gating_dist = extra_params[0]
         for i in range(maxlbl):
             coords_True = np.argwhere(True_Data == (i+1))
             coords_Pred = np.argwhere(Pred_Data == (i+1))
-            min_dists, min_dist_idx = cKDTree(coords_Pred).query(coords_True, 1)
-            matched_true = np.count_nonzero(min_dists < gating_dist)
             min_dists, min_dist_idx = cKDTree(coords_True).query(coords_Pred, 1)
-            matched_pred = np.count_nonzero(min_dists < gating_dist)
-            N_REF_LNDMRK[i] = coords_True.shape[0]
-            N_PRED_LNDMRK[i] = coords_Pred.shape[0]
-            RATE_TRUEPOS[i] = float(matched_true)/N_REF_LNDMRK[i]
-            RATE_FALSEPOS[i] = (1.0-float(matched_pred)/N_PRED_LNDMRK[i])
+            N_REF[i] = coords_True.shape[0]
+            N_PRED[i] = coords_Pred.shape[0]
+            MRE[i] = np.mean(min_dists)
 
-        metrics_dict['N_REF_LNDMRK'] = N_REF_LNDMRK
-        metrics_dict['N_PRED_LNDMRK'] = N_PRED_LNDMRK
-        metrics_dict['RATE_TRUEPOS'] = RATE_TRUEPOS
-        metrics_dict['RATE_FALSEPOS'] = RATE_FALSEPOS
-        params_dict["GATING_DIST"] = gating_dist        
+        metrics_dict['NREF'] = np.sum(N_REF)
+        metrics_dict['NPRED'] = np.sum(N_PRED)
+        metrics_dict['MRE'] = np.mean(MRE)
         
     elif problemclass == CLASS_PRTTRK:
 
@@ -289,7 +264,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
             bchmetrics = [line.split(':')[0].strip() for line in f.readlines()]
 
         metric_names = [
-            "PD", "NPSA", "FNPSB", "NRT",  "NCT",
+            "PD", "NPSA", "FNPSB", "NRT", "NCT",
             "JST", "NPT", "NMT", "NST", "NRD",
             "NCD", "JSD", "NPD", "NMD", "NSD"
         ]

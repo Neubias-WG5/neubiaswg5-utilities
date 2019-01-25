@@ -9,7 +9,7 @@ from tifffile import tifffile
 
 from neubiaswg5.problemclass import *
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
-    slices_to_mask, mask_to_points_2d
+    slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
 from shapely.affinity import affine_transform
 
 
@@ -66,7 +66,8 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     return collection
 
 
-def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None, result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, **kwargs):
+def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None,
+                               result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, **kwargs):
     """
     Parameters:
     -----------
@@ -134,6 +135,41 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
     return collection
 
 
+def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, **kwargs):
+    """
+    Parameters
+    ----------
+    out_path: str
+    in_image: ImageInstance|ImageGroup
+    project_id: int
+    upload_group_id: bool
+    kwargs: dict
+    """
+    file = "{}.tif".format(in_image.id)
+    path = os.path.join(out_path, file)
+    data = io.imread(path)
+
+    collection = AnnotationCollection()
+    if data.ndim == 2:
+        slices = skeleton_mask_to_objects_2d(data)
+        collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in slices])
+    elif data.ndim == 3:
+        # in this case `in_image` is actually an ImageGroup
+        slices = skeleton_mask_to_objects_3d(np.moveaxis(data, 0, 2), background=0, assume_unique_labels=True)
+        depth_to_image, height = get_image_seq_info(in_image)
+
+        collection.extend([
+            annotation_from_slice(
+                slice=s, id_image=depth_to_image[s.depth],
+                image_height=height, id_project=project_id,
+                label=obj_id, upload_group_id=upload_group_id
+            ) for obj_id, obj in enumerate(slices) for s in obj
+        ])
+    else:
+        raise ValueError("Only supports 2D or 3D output images...")
+    return collection
+
+
 def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_download=False, do_export=False, is_2d=True, **kwargs):
     """Upload annotations or any other related results to the server.
 
@@ -169,6 +205,8 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         extract_fn = extract_annotations_objseg
     elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT:
         extract_fn = extract_annotations_objdet
+    elif problemclass == CLASS_LOOTRC:
+        extract_fn = extract_annotations_lootrc
     else:
         raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
 
