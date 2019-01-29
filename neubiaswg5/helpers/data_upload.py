@@ -2,7 +2,7 @@ import os
 import sys
 
 import numpy as np
-from skimage import io
+from imageio import imread
 from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
 from tifffile import tifffile
@@ -43,7 +43,7 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     """
     file = "{}.tif".format(in_image.id)
     path = os.path.join(out_path, file)
-    data = io.imread(path)
+    data = imread(path)
 
     collection = AnnotationCollection()
     if data.ndim == 2:
@@ -111,11 +111,11 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
 
         if generate_mask:
             input_path = os.path.join(in_path, str(in_image.id) + "." + in_image.originalFilename.rsplit(".", 1)[1])
-            mask = slices_to_mask(points, io.imread(input_path).shape)
+            mask = slices_to_mask(points, imread(input_path).shape)
             tifffile.imsave(os.path.join(out_path, "{}.tif".format(in_image.id)), mask)
     else:
         # points stored in a mask
-        mask = io.imread(path)
+        mask = imread(path)
 
         if mask.ndim == 2:
             points = mask_to_points_2d(mask)
@@ -147,7 +147,7 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
     """
     file = "{}.tif".format(in_image.id)
     path = os.path.join(out_path, file)
-    data = io.imread(path)
+    data = imread(path)
 
     collection = AnnotationCollection()
     if data.ndim == 2:
