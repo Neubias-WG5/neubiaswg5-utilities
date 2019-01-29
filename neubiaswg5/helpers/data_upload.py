@@ -2,9 +2,9 @@ import os
 import sys
 
 import numpy as np
-from imageio import imread
 from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
+from imageio import imread
 from tifffile import tifffile
 
 from neubiaswg5.problemclass import *

@@ -28,7 +28,8 @@ setup(
         'Programming Language :: Python :: 3.7'
     ],
     install_requires=['scipy', 'tifffile', 'scikit-image', 'scikit-learn', 'pandas',
-                      'numpy', 'opencv-python-headless', 'shapely', 'skan', 'numba'],
+                      'numpy', 'opencv-python-headless', 'shapely', 'skan', 'numba',
+                      'imageio'],
     license='LICENSE'
 )
 
