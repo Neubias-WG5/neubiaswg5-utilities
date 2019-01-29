@@ -2,9 +2,8 @@ import logging
 import os
 
 from cytomine import CytomineJob
-from cytomine.models import Property, Project
+from cytomine.models import Project
 
-from neubiaswg5 import CLASS_OBJSEG
 from neubiaswg5.helpers.cytomine_metrics import MetricCollection, get_metric_result_collection, get_metric_result
 from neubiaswg5.metrics import computemetrics_batch
 
@@ -37,7 +36,6 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
         return
     if metric_params is None:
         metric_params = dict()
-    additional_properties = dict()  # properties to be added in addition to the metrics and their parameters
 
     # get image names
     filenames = ["{}.tif".format(image.id) if do_download else os.path.basename(image) for image in inputs]
@@ -66,9 +64,9 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
             metric_collection.append(metric_result)
 
             # for logging
-            image_dict = per_input_metrics.get(_input.originalFilename, {})
+            image_dict = per_input_metrics.get(_input.id, {})
             image_dict[metric.shortName] = image_dict.get(metric.shortName, []) + [values[i]]
-            per_input_metrics[_input.originalFilename] = image_dict
+            per_input_metrics[_input.id] = image_dict
 
     metric_collection.save()
 
