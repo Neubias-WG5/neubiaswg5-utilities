@@ -2,15 +2,30 @@ import os
 import sys
 
 import numpy as np
+import imageio
 from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
-from imageio import imread
-from tifffile import tifffile
 
 from neubiaswg5.problemclass import *
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
     slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
 from shapely.affinity import affine_transform
+
+
+def imread(path, is_2d=True, **kwargs):
+    """wrapper for imageio.imread or imageio.volread"""
+    if is_2d:
+        return imageio.imread(path, **kwargs)
+    else:
+        return imageio.volread(path, **kwargs)
+
+
+def imwrite(path, image, is_2d=True, **kwargs):
+    """wrapper for imageio.imwrite or imageio.volwrite"""
+    if is_2d:
+        return imageio.imwrite(path, image, **kwargs)
+    else:
+        return imageio.volwrite(path, image, **kwargs)
 
 
 def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_project, label=None, upload_group_id=False):
@@ -30,7 +45,7 @@ def get_image_seq_info(image_group):
     return {iseq.zStack: iseq.image for iseq in image_sequences}, height
 
 
-def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=False, **kwargs):
+def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters
     ----------
@@ -39,11 +54,12 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     project_id: int
     upload_group_id: bool
         True for uploading annotation group id
+    is_2d: bool
     kwargs: dict
     """
     file = "{}.tif".format(in_image.id)
     path = os.path.join(out_path, file)
-    data = imread(path)
+    data = imread(path, is_2d=is_2d)
 
     collection = AnnotationCollection()
     if data.ndim == 2:
@@ -61,13 +77,11 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
                 label=obj_id, upload_group_id=upload_group_id
             ) for obj_id, obj in enumerate(slices) for s in obj
         ])
-    else:
-        raise ValueError("Only supports 2D or 3D output images...")
     return collection
 
 
 def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None,
-                               result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, **kwargs):
+                               result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters:
     -----------
@@ -89,6 +103,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
         A function for extracting coordinates from the csv file (already separated) line.
     upload_group_id: bool
         True for uploading annotation group id
+    is_2d: bool
     kwargs: dict
     """
     file = str(in_image.id) + result_file_suffix
@@ -111,11 +126,11 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
 
         if generate_mask:
             input_path = os.path.join(in_path, str(in_image.id) + "." + in_image.originalFilename.rsplit(".", 1)[1])
-            mask = slices_to_mask(points, imread(input_path).shape)
-            tifffile.imsave(os.path.join(out_path, "{}.tif".format(in_image.id)), mask)
+            mask = slices_to_mask(points, imread(input_path, is_2d=is_2d).shape)
+            imwrite(os.path.join(out_path, "{}.tif".format(in_image.id)), mask, is_2d=is_2d)
     else:
         # points stored in a mask
-        mask = imread(path)
+        mask = imread(path, is_2d=is_2d)
 
         if mask.ndim == 2:
             points = mask_to_points_2d(mask)
@@ -135,7 +150,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
     return collection
 
 
-def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, **kwargs):
+def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters
     ----------
@@ -143,11 +158,12 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
     in_image: ImageInstance|ImageGroup
     project_id: int
     upload_group_id: bool
+    is_2d: bool
     kwargs: dict
     """
     file = "{}.tif".format(in_image.id)
     path = os.path.join(out_path, file)
-    data = imread(path)
+    data = imread(path, is_2d=is_2d)
 
     collection = AnnotationCollection()
     if data.ndim == 2:
@@ -216,7 +232,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
     collection = AnnotationCollection()
     monitor_params["prefix"] = "Extract masks/points/... from output data"
     for image in nj.monitor(inputs, **monitor_params):
-        collection.extend(extract_fn(out_path, image, nj.project.id, upload_group_id=upload_group_id, **kwargs))
+        collection.extend(extract_fn(out_path, image, nj.project.id, upload_group_id=upload_group_id, is_2d=is_2d, **kwargs))
 
     nj.job.update(statusComment="Upload extracted annotations (total: {})".format(len(collection)))
     collection.save()
