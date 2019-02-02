@@ -68,11 +68,11 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
             image_dict[metric.shortName] = image_dict.get(metric.shortName, []) + [values[i]]
             per_input_metrics[_input.id] = image_dict
 
-    metric_collection.save()
-
     nj.logger.log(logging.DEBUG, "Metrics:")
     for _name, _metrics in per_input_metrics.items():
         nj.logger.log(logging.DEBUG, "> {}: {}".format(
             _name,
             ", ".join(["{}:{}".format(m, v) for m, v in _metrics.items()])
         ))
+
+    metric_collection.save()
