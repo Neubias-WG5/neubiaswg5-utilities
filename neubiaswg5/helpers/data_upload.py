@@ -8,6 +8,7 @@ from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, 
 from shapely.geometry import LineString
 
 from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
+from neubiaswg5.helpers.data_preparation import get_image_name
 from neubiaswg5.problemclass import *
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
     slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
@@ -28,6 +29,10 @@ def imwrite(path, image, is_2d=True, **kwargs):
         return imageio.imwrite(path, image, **kwargs)
     else:
         return imageio.volwrite(path, image, **kwargs)
+
+
+def get_image_extension(image, is_2d=True):
+    return get_image_name(image, is_2d=is_2d).rsplit(".", 1)[1]
 
 
 def change_referential(p, height):
@@ -168,7 +173,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
         ])
 
         if generate_mask:
-            input_path = os.path.join(in_path, str(in_image.id) + "." + in_image.originalFilename.rsplit(".", 1)[1])
+            input_path = os.path.join(in_path, str(in_image.id) + "." + get_image_extension(in_image, is_2d=is_2d))
             mask = slices_to_mask(points, imread(input_path, is_2d=is_2d).shape)
             imwrite(os.path.join(out_path, "{}.tif".format(in_image.id)), mask, is_2d=is_2d)
     else:
