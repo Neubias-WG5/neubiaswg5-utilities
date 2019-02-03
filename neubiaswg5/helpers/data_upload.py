@@ -80,7 +80,7 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     return collection
 
 
-def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None,
+def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, generate_mask=False, in_path=None,
                                result_file_suffix="_results.txt", has_headers=False, parse_fn=None, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters:
