@@ -212,7 +212,8 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
         sorted_group = sorted(slice_group, key=lambda s: s.time)
         prev_line = []
         for _slice in sorted_group:
-            prev_line.append(_slice.polygon)
+            if len(prev_line) == 0 or not prev_line[-1].equals(_slice.polygon):
+                prev_line.append(_slice.polygon)
 
             if len(prev_line) == 1:
                 polygon = _slice.polygon
