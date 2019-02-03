@@ -5,6 +5,7 @@ import numpy as np
 import imageio
 from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
+from shapely.geometry import LineString
 
 from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
 from neubiaswg5.problemclass import *
@@ -29,21 +30,37 @@ def imwrite(path, image, is_2d=True, **kwargs):
         return imageio.volwrite(path, image, **kwargs)
 
 
+def change_referential(p, height):
+    return affine_transform(p, [1, 0, 0, -1, 0, height])
+
+
+def get_group_id_dict(label):
+    return {"key": "ANNOTATION_GROUP_ID", "value": label}
+
+
 def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_project, label=None, upload_group_id=False):
+    """
+    slice: AnnotationSlice
+    id_image: int
+    image_height: int
+    id_project: int
+    label: int
+    upload_group_id: bool
+    """
     parameters = {
-        "location": affine_transform(slice.polygon, [1, 0, 0, -1, 0, image_height]).wkt,
+        "location": change_referential(slice.polygon, image_height).wkt,
         "id_image": id_image,
         "id_project": id_project
     }
     if upload_group_id:
-        parameters["property"] = [{"key": "ANNOTATION_GROUP_ID", "value": slice.label if label is None else label}]
+        parameters["property"] = [get_group_id_dict(slice.label if label is None else label)]
     return Annotation(**parameters)
 
 
-def get_image_seq_info(image_group):
+def get_image_seq_info(image_group, time=False):
     image_sequences = ImageSequenceCollection().fetch_with_filter("imagegroup", image_group.id)
     height = ImageInstance().fetch(image_sequences[0].image).height
-    return {iseq.zStack: iseq.image for iseq in image_sequences}, height
+    return {iseq.zStack if not time else iseq.time: iseq.image for iseq in image_sequences}, height
 
 
 def mask_convert(mask, in_image, project_id, mask_2d_fn, mask_3d_fn, upload_group_id=False):
@@ -56,7 +73,7 @@ def mask_convert(mask, in_image, project_id, mask_2d_fn, mask_3d_fn, upload_grou
     project_id: int
     mask_2d_fn: callable
     mask_3d_fn: callable
-    upload_group_id: int|None
+    upload_group_id: bool
 
     Returns
     -------
@@ -159,9 +176,57 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
         collection = mask_convert(
             imread(path, is_2d=is_2d), in_image, project_id,
             mask_2d_fn=mask_to_points_2d,
-            mask_3d_fn=lambda m: mask_to_points_3d(m, time=False),
+            mask_3d_fn=lambda m: mask_to_points_3d(np.moveaxis(m, 0, 2), time=False, assume_unique_labels=False),
             upload_group_id=upload_group_id
         )
+
+    return collection
+
+
+def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=False, is_2d=False, **kwargs):
+    """
+    Parameters:
+    -----------
+    out_path: str
+    in_image: ImageInstance
+    project_id: int
+    upload_group_id: bool
+    is_2d: bool
+    kwargs: dict
+    """
+    if is_2d:
+        raise ValueError("Annotation extraction function called with is_2d=True: object tracking should be at least 3D")
+
+    file = "{}.tif".format(in_image.id)
+    path = os.path.join(out_path, file)
+    data = imread(path, is_2d=is_2d)
+
+    if data.ndim != 3:
+        raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
+
+    slices = mask_to_points_3d(np.moveaxis(data, 0, 2), time=True, assume_unique_labels=True)
+    time_to_image, height = get_image_seq_info(in_image, time=True)
+
+    collection = AnnotationCollection()
+    for slice_group in slices:
+        sorted_group = sorted(slice_group, key=lambda s: s.time)
+        prev_line = []
+        for _slice in sorted_group:
+            prev_line.append(_slice.polygon)
+
+            if len(prev_line) == 1:
+                polygon = _slice.polygon
+            else:
+                polygon = LineString(prev_line)
+
+            annotation_params = {
+                "location": change_referential(polygon, height).wkt,
+                "id_image": time_to_image[_slice.time],
+                "id_project": project_id
+            }
+            if upload_group_id:
+                annotation_params["property"] = [get_group_id_dict(_slice.label)]
+            collection.append(Annotation(**annotation_params))
 
     return collection
 
@@ -227,6 +292,8 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         extract_fn = extract_annotations_objdet
     elif problemclass == CLASS_LOOTRC:
         extract_fn = extract_annotations_lootrc
+    elif problemclass == CLASS_PRTTRK:
+        extract_fn = extract_annotations_prttrk
     else:
         raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
 
