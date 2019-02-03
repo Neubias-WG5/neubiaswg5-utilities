@@ -6,6 +6,7 @@ import imageio
 from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection
 
+from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
 from neubiaswg5.problemclass import *
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
     slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
@@ -45,6 +46,42 @@ def get_image_seq_info(image_group):
     return {iseq.zStack: iseq.image for iseq in image_sequences}, height
 
 
+def mask_convert(mask, in_image, project_id, mask_2d_fn, mask_3d_fn, upload_group_id=False):
+    """Generic function to convert a mask into an annotation collection
+
+    Parameters
+    ----------
+    mask: ndarray
+    in_image: ImageInstance|ImageGroup
+    project_id: int
+    mask_2d_fn: callable
+    mask_3d_fn: callable
+    upload_group_id: int|None
+
+    Returns
+    -------
+    collection: AnnotationCollection
+    """
+    collection = AnnotationCollection()
+    if mask.ndim == 2:
+        slices = mask_2d_fn(mask)
+        collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in slices])
+    elif mask.ndim == 3:
+        slices = mask_3d_fn(mask)
+        depth_to_image, height = get_image_seq_info(in_image)
+
+        collection.extend([
+            annotation_from_slice(
+                slice=s, id_image=depth_to_image[s.depth],
+                image_height=height, id_project=project_id,
+                label=obj_id, upload_group_id=upload_group_id
+            ) for obj_id, obj in enumerate(slices) for s in obj
+        ])
+    else:
+        raise ValueError("Only supports 2D or 3D output images...")
+    return collection
+
+
 def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters
@@ -61,23 +98,12 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     path = os.path.join(out_path, file)
     data = imread(path, is_2d=is_2d)
 
-    collection = AnnotationCollection()
-    if data.ndim == 2:
-        slices = mask_to_objects_2d(data)
-        collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in slices])
-    elif data.ndim == 3:
-        # in this case `in_image` is actually an ImageGroup
-        slices = mask_to_objects_3d(np.moveaxis(data, 0, 2), background=0, assume_unique_labels=True)
-        depth_to_image, height = get_image_seq_info(in_image)
-
-        collection.extend([
-            annotation_from_slice(
-                slice=s, id_image=depth_to_image[s.depth],
-                image_height=height, id_project=project_id,
-                label=obj_id, upload_group_id=upload_group_id
-            ) for obj_id, obj in enumerate(slices) for s in obj
-        ])
-    return collection
+    return mask_convert(
+        data, in_image, project_id,
+        mask_2d_fn=mask_to_objects_2d,
+        mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
+        upload_group_id=upload_group_id
+    )
 
 
 def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, generate_mask=False, in_path=None,
@@ -130,22 +156,12 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=True, gene
             imwrite(os.path.join(out_path, "{}.tif".format(in_image.id)), mask, is_2d=is_2d)
     else:
         # points stored in a mask
-        mask = imread(path, is_2d=is_2d)
-
-        if mask.ndim == 2:
-            points = mask_to_points_2d(mask)
-            collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in points])
-        elif mask.ndim == 3:
-            points = mask_to_objects_3d(mask, time=False)
-            depth_to_image, height = get_image_seq_info(in_image)
-
-            collection.extend([
-                annotation_from_slice(
-                    slice=s, id_image=depth_to_image[s.depth],
-                    image_height=height, id_project=project_id,
-                    label=obj_id, upload_group_id=upload_group_id
-                ) for obj_id, obj in enumerate(points) for s in obj
-            ])
+        collection = mask_convert(
+            imread(path, is_2d=is_2d), in_image, project_id,
+            mask_2d_fn=mask_to_points_2d,
+            mask_3d_fn=lambda m: mask_to_points_3d(m, time=False),
+            upload_group_id=upload_group_id
+        )
 
     return collection
 
@@ -165,24 +181,12 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
     path = os.path.join(out_path, file)
     data = imread(path, is_2d=is_2d)
 
-    collection = AnnotationCollection()
-    if data.ndim == 2:
-        slices = skeleton_mask_to_objects_2d(data)
-        collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in slices])
-    elif data.ndim == 3:
-        # in this case `in_image` is actually an ImageGroup
-        slices = skeleton_mask_to_objects_3d(np.moveaxis(data, 0, 2), background=0, assume_unique_labels=True)
-        depth_to_image, height = get_image_seq_info(in_image)
-
-        collection.extend([
-            annotation_from_slice(
-                slice=s, id_image=depth_to_image[s.depth],
-                image_height=height, id_project=project_id,
-                label=obj_id, upload_group_id=upload_group_id
-            ) for obj_id, obj in enumerate(slices) for s in obj
-        ])
-    else:
-        raise ValueError("Only supports 2D or 3D output images...")
+    collection = mask_convert(
+        data, in_image, project_id,
+        mask_2d_fn=skeleton_mask_to_objects_2d,
+        mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
+        upload_group_id=upload_group_id
+    )
     return collection
 
 
