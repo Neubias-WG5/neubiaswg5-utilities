@@ -1,3 +1,5 @@
+from itertools import groupby
+
 import numpy as np
 from shapely.geometry import Point, box
 
@@ -30,31 +32,40 @@ def mask_to_points_2d(mask, points=True):
     ]
 
 
-def mask_to_points_3d(mask, time=False):
+def mask_to_points_3d(mask, time=False, assume_unique_labels=False):
     """Converts a point label 3D mask to a set of points.
 
     Parameters
     ----------
     mask: ndarray
         The point label mask
+    assume_unique_labels: bool
+        True if labels represent unique objects
     time: bool
         True if the third dimension is the time
 
     Returns
     -------
-    slices: list
+    slices: list (subtype: list)
         List of annotations slices
     """
     pixels = np.nonzero(mask)
     labels = mask[pixels]
-    return [
+    slices = [
         AnnotationSlice(
             polygon=Point(x, y),
             label=label,
             time=None if not time else z,
             depth=None if time else z
-        ) for (z, y, x), label in zip(zip(*pixels), labels)
+            ) for (y, x, z), label in zip(zip(*pixels), labels)
     ]
+    if assume_unique_labels:
+        label_fn = lambda s: s.label
+        _, grouped = groupby(sorted(slices, key=label_fn), key=label_fn)
+        return list(grouped)
+    else:
+        return list(map(lambda i: [i], slices))
+
 
 
 def csv_to_points(filepath, sep='\t', parse_fn=None, has_z=False, has_t=False, has_headers=False):

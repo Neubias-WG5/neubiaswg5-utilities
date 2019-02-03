@@ -41,10 +41,12 @@ class TestMaskToPoints(TestCase):
         for l, (y, x, z) in list(to_draw):
             image[y, x, z] = l
 
-        points = mask_to_points_3d(image)
+        slices = mask_to_points_3d(image)
 
-        self.assertEqual(len(points), 2)
-        self.assertSetEqual(to_draw, {(s.label, (s.polygon.y, s.polygon.x, s.depth)) for s in points})
+        self.assertEqual(len(slices), 2)
+        self.assertEqual(len(slices[0]), 1)
+        self.assertEqual(len(slices[1]), 1)
+        self.assertSetEqual(to_draw, {(p.label, (p.polygon.y, p.polygon.x, p.depth)) for points in slices for p in points})
 
 
 class TestCsvToPoints(TestCase):
