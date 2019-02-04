@@ -35,6 +35,9 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     """
     if not do_compute_metrics:
         return
+    if len(inputs) == 0:
+        nj.logger.info("Skipping metric computation because there is no images to process.")
+        return
     if metric_params is None:
         metric_params = dict()
 
@@ -57,7 +60,7 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     project = Project().fetch(nj.project.id)
     metrics = MetricCollection().fetch_with_filter("discipline", project.discipline)
 
-    metric_collection = get_metric_result_collection(inputs)
+    metric_collection = get_metric_result_collection(inputs[0].object)
     per_input_metrics = dict()
     for metric_name, values in results.items():
         # check if metric is supposed to be computed for this problem class

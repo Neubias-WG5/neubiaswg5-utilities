@@ -62,7 +62,7 @@ class NeubiasCytomineInput(NeubiasInput):
 
     @property
     def filename(self):
-        return resolve_pattern(self._name_pattern, self.object)
+        return resolve_pattern(self._name_pattern, self.object)[0]
 
     @property
     def filepath(self):

@@ -64,12 +64,14 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
 
     nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
     images = collection_class().fetch_with_filter("project", nj.parameters.cytomine_id_project)
-    in_images = [input_class(image, in_path, "{id}.tif") for image in images if gt_suffix not in input_class(image).original_filename]
+    in_images = [input_class(i, in_path, "{id}.tif") for i in images if gt_suffix not in input_class(i).original_filename]
 
     gt_images = list()
     for image in images:
-        gt_image = input_class(gt_images)
-        related_name = gt_image.original_filename.replace(gt_suffix)
+        gt_image = input_class(image)
+        if gt_suffix not in gt_image.original_filename:
+            continue
+        related_name = gt_image.original_filename.replace(gt_suffix, "")
         related_image = images.find_by_attribute(gt_image.filename_attribute, related_name)
         if related_image is None:
             raise ValueError("Missing ground truth image for label image {}".format(image.id))
