@@ -115,3 +115,13 @@ class NeubiasFilepath(NeubiasInput):
     @property
     def extension(self):
         return self.filename.rsplit(".", 1)[1]
+
+
+class NeubiasAttachedFile(NeubiasCytomineInput):
+
+    def __init__(self, attached_file, in_path="", name_pattern="{filename}"):
+        super().__init__(attached_file, in_path, name_pattern)
+
+    @property
+    def filename_attribute(self):
+        return "filename"

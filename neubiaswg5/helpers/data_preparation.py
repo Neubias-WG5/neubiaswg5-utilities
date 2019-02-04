@@ -1,5 +1,4 @@
 import os
-import shutil
 from pathlib import Path
 
 from cytomine import CytomineJob
@@ -7,7 +6,7 @@ from cytomine.models import ImageInstanceCollection, ImageGroupCollection, Attac
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
 from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasImageInstance, NeubiasImageGroup, \
-    NeubiasFilepath
+    NeubiasFilepath, NeubiasAttachedFile
 
 
 def get_file_extension(path):
@@ -103,19 +102,20 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
         if do_download:
             # extract most recent file
             files = AttachedFileCollection(image).fetch()
-            current_file = sorted(files.data(), key=lambda f: int(f.created), reverse=True)[0]
+            most_recent = sorted(files.data(), key=lambda f: int(f.created), reverse=True)[0]
 
             # download the last file
-            extension = get_file_extension(current_file.filename)
-            attached_path = os.path.join(path, "{}{}{}".format(image.id, suffix, extension))
-            current_file.download(attached_path)
+            attached_file = NeubiasAttachedFile(most_recent, path, name_pattern="{filename}")
+            most_recent.download(attached_file.filepath)
         else:
             image_name = os.path.basename(image).rsplit(".")[0]
             attached_name = "{}".format(image_name, suffix)
             if attached_name not in existing_files:
                 raise FileNotFoundError("Missing attached file for input image '{}'.".format(image))
-            attached_path = os.path.join(path, "{}{}".format(attached_name, existing_extensions[attached_name]))
-        in_image.attached.append(attached_path)
+            attached_file = NeubiasFilepath(os.path.join(
+                path, "{}{}".format(attached_name, existing_extensions[attached_name])
+            ))
+        in_image.attached.append(attached_file)
 
 
 def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
