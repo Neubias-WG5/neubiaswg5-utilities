@@ -79,9 +79,9 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
             image_dict[metric.shortName] = image_dict.get(metric.shortName, []) + [values[i]]
             per_input_metrics[image.id] = image_dict
 
-    nj.logger.log(logging.DEBUG, "Metrics:")
+    nj.logger.info("Metrics:")
     for _name, _metrics in per_input_metrics.items():
-        nj.logger.log(logging.DEBUG, "> {}: {}".format(
+        nj.logger.info("> {}: {}".format(
             _name,
             ", ".join(["{}:{}".format(m, v) for m, v in _metrics.items()])
         ))
