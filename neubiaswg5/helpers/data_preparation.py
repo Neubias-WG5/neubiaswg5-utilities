@@ -3,27 +3,11 @@ import shutil
 from pathlib import Path
 
 from cytomine import CytomineJob
-from cytomine.models import ImageInstanceCollection, ImageGroupCollection, AttachedFileCollection, AttachedFile
+from cytomine.models import ImageInstanceCollection, ImageGroupCollection, AttachedFileCollection
 
-from neubiaswg5 import CLASS_OBJTRK, CLASS_LOOTRC, CLASS_TRETRC
-from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists
-
-
-def get_image_name(image, is_2d=True):
-    """
-    Parameters
-    ----------
-    image: ImageInstance|ImageGroup
-        An image group
-    is_2d: bool
-        True if 2d then image is an ImageInstance. Otherwise 3d, then image is a ImageGroup.
-    Returns
-    -------
-    """
-    if is_2d:
-        return image.originalFilename
-    else:
-        return image.name
+from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
+from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasImageInstance, NeubiasImageGroup, \
+    NeubiasFilepath
 
 
 def get_file_extension(path):
@@ -71,25 +55,32 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         Ground truth images
     """
     if not do_download:
-        in_images = [os.path.join(in_path, f) for f in os.listdir(in_path)]
-        gt_images = [os.path.join(gt_path, f) for f in os.listdir(gt_path)]
+        in_images = [NeubiasFilepath(os.path.join(in_path, f)) for f in os.listdir(in_path)]
+        gt_images = [NeubiasFilepath(os.path.join(gt_path, f)) for f in os.listdir(gt_path)]
         return in_images, gt_images
 
     collection_class = ImageInstanceCollection if is_2d else ImageGroupCollection
+    input_class = NeubiasImageInstance if is_2d else NeubiasImageGroup
 
     nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
     images = collection_class().fetch_with_filter("project", nj.parameters.cytomine_id_project)
-    in_images = [i for i in images if gt_suffix not in get_image_name(i, is_2d=is_2d)]
-    gt_images = [i for i in images if gt_suffix in get_image_name(i, is_2d=is_2d)]
+    in_images = [input_class(image, in_path, "{id}.tif") for image in images if gt_suffix not in input_class(image).original_filename]
 
-    for input_image in in_images:
-        input_image.download(os.path.join(in_path, "{id}.tif"), parent=True)
+    gt_images = list()
+    for image in images:
+        gt_image = input_class(gt_images)
+        related_name = gt_image.original_filename.replace(gt_suffix)
+        related_image = images.find_by_attribute(gt_image.filename_attribute, related_name)
+        if related_image is None:
+            raise ValueError("Missing ground truth image for label image {}".format(image.id))
+        gt_image = input_class(image, gt_path, "{}.tif".format(related_image.id))
+        gt_images.append(gt_image)
+
+    for in_image in in_images:
+        in_image.object.download(in_image.filepath, parent=True)
 
     for gt_image in gt_images:
-        related_name = get_image_name(gt_image, is_2d=is_2d).replace(gt_suffix, '')
-        related_image = [i for i in in_images if related_name == get_image_name(i, is_2d=is_2d)]
-        if len(related_image) == 1:
-            gt_image.download(os.path.join(gt_path, "{}.tif".format(related_image[0].id)), parent=True)
+        gt_image.object.download(gt_image.filepath, parent=True)
 
     return in_images, gt_images
 
@@ -100,14 +91,13 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
     If do_download is False, then the attached file must have the same name (without extension) as the corresponding
     input file plus the suffix.
     """
-    new_inputs = list()
-
     # if do_download is False, need to scan for existing attached files
     existing_files = {get_file_name(f) for f in os.listdir(path) if suffix in f}
     existing_extensions = {get_file_name(f): get_file_extension(f) for f in os.listdir(path) if suffix in f}
 
     # get path for all inputs
-    for image in inputs:
+    for in_image in inputs:
+        image = in_image.object
         if do_download:
             # extract most recent file
             files = AttachedFileCollection(image).fetch()
@@ -123,8 +113,7 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
             if attached_name not in existing_files:
                 raise FileNotFoundError("Missing attached file for input image '{}'.".format(image))
             attached_path = os.path.join(path, "{}{}".format(attached_name, existing_extensions[attached_name]))
-        new_inputs.append((image, attached_path))
-    return new_inputs
+        in_image.attached.append(attached_path)
 
 
 def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
@@ -208,8 +197,8 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     # download additional data
     if problemclass == CLASS_TRETRC:
         suffix = kwargs.get("suffix", "_attached")
-        in_data = download_attached(in_data, in_path, suffix=suffix, do_download=do_download)
-        gt_data = download_attached(gt_data, gt_path, suffix=suffix, do_download=do_download)
+        download_attached(in_data, in_path, suffix=suffix, do_download=do_download)
+        download_attached(gt_data, gt_path, suffix=suffix, do_download=do_download)
     elif problemclass == CLASS_OBJTRK:
         raise NotImplementedError("Problemclass '{}' needs additional data. Download of this "
                                   "data hasn't been implemented yet".format(problemclass))

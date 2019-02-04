@@ -68,13 +68,13 @@ def get_image_seq_info(image_group, time=False):
     return {iseq.zStack if not time else iseq.time: iseq.image for iseq in image_sequences}, height
 
 
-def mask_convert(mask, in_image, project_id, mask_2d_fn, mask_3d_fn, upload_group_id=False):
+def mask_convert(mask, image, project_id, mask_2d_fn, mask_3d_fn, upload_group_id=False):
     """Generic function to convert a mask into an annotation collection
 
     Parameters
     ----------
     mask: ndarray
-    in_image: ImageInstance|ImageGroup
+    image: ImageInstance|ImageGroup
     project_id: int
     mask_2d_fn: callable
     mask_3d_fn: callable
@@ -87,10 +87,10 @@ def mask_convert(mask, in_image, project_id, mask_2d_fn, mask_3d_fn, upload_grou
     collection = AnnotationCollection()
     if mask.ndim == 2:
         slices = mask_2d_fn(mask)
-        collection.extend([annotation_from_slice(s, in_image.id, in_image.height, project_id) for s in slices])
+        collection.extend([annotation_from_slice(s, image.id, image.height, project_id) for s in slices])
     elif mask.ndim == 3:
         slices = mask_3d_fn(mask)
-        depth_to_image, height = get_image_seq_info(in_image)
+        depth_to_image, height = get_image_seq_info(image)
 
         collection.extend([
             annotation_from_slice(
@@ -109,19 +109,20 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     Parameters
     ----------
     out_path: str
-    in_image: ImageInstance|ImageGroup
+    in_image: NeubiasCytomineInput
     project_id: int
     upload_group_id: bool
         True for uploading annotation group id
     is_2d: bool
     kwargs: dict
     """
-    file = "{}.tif".format(in_image.id)
+    image = in_image.object
+    file = "{}.tif".format(image.id)
     path = os.path.join(out_path, file)
     data = imread(path, is_2d=is_2d)
 
     return mask_convert(
-        data, in_image, project_id,
+        data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
         mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
         upload_group_id=upload_group_id
@@ -134,7 +135,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, gen
     Parameters:
     -----------
     out_path: str
-    in_image: ImageInstance|ImageGroup
+    in_image: NeubiasCytomineInput
     project_id: int
     is_csv: bool
         True if the output data are stored in a csv file
@@ -154,12 +155,13 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, gen
     is_2d: bool
     kwargs: dict
     """
-    file = str(in_image.id) + result_file_suffix
+    image = in_image.object
+    file = str(image.id) + result_file_suffix
     path = os.path.join(out_path, file)
 
     collection = AnnotationCollection()
     if not os.path.isfile(path):
-        print("No output file at '{}' for image with id:{}.".format(path, in_image.id), file=sys.stderr)
+        print("No output file at '{}' for image with id:{}.".format(path, image.id), file=sys.stderr)
         return collection
 
     # whether the points are stored in a csv or a mask
@@ -168,18 +170,17 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, gen
             raise ValueError("parse_fn shouldn't be 'None' when result file is a CSV.")
         points = csv_to_points(path, has_headers=has_headers, parse_fn=parse_fn)
         collection.extend([
-            annotation_from_slice(slice, in_image.id, in_image.height, project_id)
+            annotation_from_slice(slice, image.id, image.height, project_id)
             for slice in points
         ])
 
         if generate_mask:
-            input_path = os.path.join(in_path, str(in_image.id) + "." + get_image_extension(in_image, is_2d=is_2d))
-            mask = slices_to_mask(points, imread(input_path, is_2d=is_2d).shape)
-            imwrite(os.path.join(out_path, "{}.tif".format(in_image.id)), mask, is_2d=is_2d)
+            mask = slices_to_mask(points, imread(in_image.filepath, is_2d=is_2d).shape)
+            imwrite(os.path.join(out_path, in_image.filename), mask, is_2d=is_2d)
     else:
         # points stored in a mask
         collection = mask_convert(
-            imread(path, is_2d=is_2d), in_image, project_id,
+            imread(path, is_2d=is_2d), image, project_id,
             mask_2d_fn=mask_to_points_2d,
             mask_3d_fn=lambda m: mask_to_points_3d(np.moveaxis(m, 0, 2), time=False, assume_unique_labels=False),
             upload_group_id=upload_group_id
@@ -193,7 +194,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
     Parameters:
     -----------
     out_path: str
-    in_image: ImageInstance
+    in_image: NeubiasCytomineInput
     project_id: int
     upload_group_id: bool
     is_2d: bool
@@ -202,7 +203,8 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
     if is_2d:
         raise ValueError("Annotation extraction function called with is_2d=True: object tracking should be at least 3D")
 
-    file = "{}.tif".format(in_image.id)
+    image = in_image.object
+    file = "{}.tif".format(image.id)
     path = os.path.join(out_path, file)
     data = imread(path, is_2d=is_2d)
 
@@ -210,7 +212,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
         raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
 
     slices = mask_to_points_3d(np.moveaxis(data, 0, 2), time=True, assume_unique_labels=True)
-    time_to_image, height = get_image_seq_info(in_image, time=True)
+    time_to_image, height = get_image_seq_info(image, time=True)
 
     collection = AnnotationCollection()
     for slice_group in slices:
@@ -242,18 +244,19 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
     Parameters
     ----------
     out_path: str
-    in_image: ImageInstance|ImageGroup
+    in_image: NeubiasCytomineInput
     project_id: int
     upload_group_id: bool
     is_2d: bool
     kwargs: dict
     """
-    file = "{}.tif".format(in_image.id)
+    image = in_image.object
+    file = "{}.tif".format(image.id)
     path = os.path.join(out_path, file)
     data = imread(path, is_2d=is_2d)
 
     collection = mask_convert(
-        data, in_image, project_id,
+        data, image, project_id,
         mask_2d_fn=skeleton_mask_to_objects_2d,
         mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
         upload_group_id=upload_group_id
@@ -308,8 +311,12 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
 
     collection = AnnotationCollection()
     monitor_params["prefix"] = "Extract masks/points/... from output data"
-    for image in nj.monitor(inputs, **monitor_params):
-        collection.extend(extract_fn(out_path, image, nj.project.id, upload_group_id=upload_group_id, is_2d=is_2d, **kwargs))
+    for in_image in nj.monitor(inputs, **monitor_params):
+        collection.extend(extract_fn(
+            out_path, in_image, nj.project.id,
+            upload_group_id=upload_group_id,
+            is_2d=is_2d, **kwargs
+        ))
 
     nj.job.update(statusComment="Upload extracted annotations (total: {})".format(len(collection)))
     collection.save()
