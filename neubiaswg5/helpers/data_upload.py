@@ -290,7 +290,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
     if monitor_params is None:
         monitor_params = dict()
 
-    if problemclass == CLASS_OBJSEG:
+    if problemclass == CLASS_OBJSEG or problemclass == CLASS_PIXCLA:
         extract_fn = extract_annotations_objseg
     elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT:
         extract_fn = extract_annotations_objdet
