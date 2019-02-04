@@ -8,6 +8,13 @@ from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
 from neubiaswg5.helpers.util import check_field
 
 
+def get_discipline(nj, default):
+    if hasattr(nj, "project"):
+        return nj.project.disciplineShortName
+    else:
+        return default
+
+
 class NeubiasParameter(object):
     """Partially compatible with SoftwareParameter in order work with _software_params_to_argparse"""
     def __init__(self, **parameters):
