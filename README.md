@@ -96,6 +96,7 @@ Returns:
 
 Annotation export tools.
 
+NOTE: in 3D, the exporter expects the dimensions to be in this order: `[y, x, z/t]`
 ### Annotation slice
 
 The `AnnotationSlice` class represents a 2D annotation with additional metadata when relevant:
