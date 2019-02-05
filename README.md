@@ -1,5 +1,7 @@
 # Neubias-WG5 utilities
 
+![version](https://img.shields.io/badge/version-0.5.2a-blue.svg?maxAge=2592000)
+
 Utilities for Neubias WG5 softwares
 
 ## Running workflows locally
