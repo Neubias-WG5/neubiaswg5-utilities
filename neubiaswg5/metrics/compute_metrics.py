@@ -174,10 +174,17 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Read metadata from reference image (OME-TIFF)
         img = tiff.TiffFile(reffile)
-        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
-        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
-        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
-        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+        array = img.asarray()
+        T = 1  # never have time for objdet
+
+        if array.ndim > 2:
+            pixels = img.ome_metadata.get('Image').get('Pixels')
+            Z = pixels.get('SizeZ')
+            X = pixels.get('SizeX')
+            Y = pixels.get('SizeY')
+        else:
+            Y, X = array.shape
+            Z = 1
 
         # Convert non null pixels coordinates to track files (single time point)
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
