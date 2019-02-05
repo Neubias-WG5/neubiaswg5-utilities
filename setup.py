@@ -1,9 +1,28 @@
+import sys
+
 from setuptools import setup
 
 import neubiaswg5
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+
+
+if sys.version_info[0] == 3:
+    # TODO fix version of tifffile once PACKBITS bug is fixed
+    packages = [
+        'scipy==1.2', 'tifffile', 'scikit-image==0.14.2', 'scikit-learn==0.20.2', 'pandas==0.24.1',
+        'numpy==1.15.4', 'opencv-python-headless==4.0.0.21', 'shapely==1.7a1', 'skan==0.7.1', 'numba==0.42.0',
+        'imageio==2.4.1'
+    ]
+else:
+    # TODO make a version for python 2.7
+    packages = [
+        'scipy', 'tifffile', 'scikit-image', 'scikit-learn', 'pandas',
+        'numpy', 'opencv-python-headless', 'shapely', 'skan', 'numba',
+        'imageio'
+    ]
+
 
 setup(
     name='Neubias-WG5 Utilities',
@@ -27,9 +46,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7'
     ],
-    install_requires=['scipy', 'tifffile', 'scikit-image', 'scikit-learn', 'pandas',
-                      'numpy', 'opencv-python-headless', 'shapely', 'skan', 'numba',
-                      'imageio'],
+    install_requires=packages,
     license='LICENSE'
 )
 
