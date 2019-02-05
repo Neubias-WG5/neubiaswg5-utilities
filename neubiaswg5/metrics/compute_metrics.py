@@ -106,10 +106,10 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
-        y_pred = np.array(Pred_Data).ravel()	# Convert to 1-D array
+        y_pred = np.array(Pred_Data).ravel()  # Convert to 1-D array
         True_ImFile = tiff.TiffFile(reffile)
         True_Data = True_ImFile.asarray()
-        y_true = np.array(True_Data).ravel()	# Convert to 1-D array
+        y_true = np.array(True_Data).ravel()  # Convert to 1-D array
         cnt_pred = np.count_nonzero(y_pred)
         cnt_true = np.count_nonzero(y_true)
         bchmetrics = abs(cnt_pred-cnt_true)/cnt_true
@@ -118,27 +118,15 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     elif problemclass == CLASS_PIXCLA:
 
-        Pred_ImFile = tiff.TiffFile(infile)
-        Pred_Data = Pred_ImFile.asarray()
-        y_pred = np.array(Pred_Data).ravel()	# Convert to 1-D array
-        True_ImFile = tiff.TiffFile(reffile)
-        True_Data = True_ImFile.asarray()
-        y_true = np.array(True_Data).ravel()	# Convert to 1-D array
+        pred_image = tiff.TiffFile(infile)
+        y_pred = pred_image.asarray().ravel()  # Convert to 1-D array
+        true_image = tiff.TiffFile(reffile)
+        y_true = true_image.asarray().ravel()  # Convert to 1-D array
 
-        # Clean the predictions and ground truths (labels: 1,2,3... anything else is discarded)
-        y_true_cleaned = []
-        y_pred_cleaned = []
-
-        for i in range(0, len(y_true)):
-            if y_true[i] > 0 or y_pred[i]>0:
-                y_true_cleaned.append(y_true[i]>0)
-                y_pred_cleaned.append(y_pred[i]>0)
-
-        #metrics_dict["CM"] = confusion_matrix(y_true_cleaned, y_pred_cleaned)
-        metrics_dict["F1"] = f1_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
-        metrics_dict["ACC"] = accuracy_score(y_true_cleaned, y_pred_cleaned, normalize=True, sample_weight=None)
-        metrics_dict["PR"] = precision_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
-        metrics_dict["RE"] = recall_score(y_true_cleaned, y_pred_cleaned, labels=None, pos_label=1, average='weighted', sample_weight=None)
+        metrics_dict["ACC"] = accuracy_score(y_true, y_pred, normalize=True, sample_weight=None)
+        metrics_dict["F1"] = f1_score(y_true, y_pred, labels=None, average='weighted')
+        metrics_dict["PR"] = precision_score(y_true, y_pred, labels=None, average='weighted')
+        metrics_dict["RE"] = recall_score(y_true, y_pred, labels=None, average='weighted')
 
     elif problemclass == CLASS_TRETRC:
 
