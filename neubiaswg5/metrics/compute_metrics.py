@@ -75,6 +75,22 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, verbose=True, **ext
     return outputs
 
 
+def get_dimensions(tiff, time=False):
+    array = tiff.asarray()
+    T, Z = 1, 1
+    if array.dim > 2:
+        pixels = tiff.ome_metadata.get('Image').get('Pixels')
+        Y, X = pixels.get('SizeY'), pixels.get('SizeX')
+
+        if array.dim > 3 or time:
+            T = pixels.get('SizeT')
+        if array.dim > 3 or not time:
+            Z = pixels.get('SizeZ')
+    else:
+        Y, X = array.shape
+
+    return T, Z, Y, X
+
 def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
     # Remove all xml and txt (temporary) files in tmpfolder
     filelist = [ f for f in os.listdir(tmpfolder) if (f.endswith(".xml") or f.endswith(".txt")) ]
@@ -174,17 +190,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Read metadata from reference image (OME-TIFF)
         img = tiff.TiffFile(reffile)
-        array = img.asarray()
-        T = 1  # never have time for objdet
-
-        if array.ndim > 2:
-            pixels = img.ome_metadata.get('Image').get('Pixels')
-            Z = pixels.get('SizeZ')
-            X = pixels.get('SizeX')
-            Y = pixels.get('SizeY')
-        else:
-            Y, X = array.shape
-            Z = 1
+        T, Z, Y, X = get_dimensions(img, time=False)
 
         # Convert non null pixels coordinates to track files (single time point)
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
@@ -236,10 +242,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Read metadata from reference image (OME-TIFF)
         img = tiff.TiffFile(reffile)
-        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
-        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
-        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
-        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+        T, Z, Y, X = get_dimensions(img, time=False)
 
         # Convert non null pixels coordinates to track files
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
@@ -280,10 +283,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Read metadata from reference image (OME-TIFF)
         img = tiff.TiffFile(reffile)
-        T = img.ome_metadata.get('Image').get('Pixels').get('SizeT')
-        Z = img.ome_metadata.get('Image').get('Pixels').get('SizeZ')
-        Y = img.ome_metadata.get('Image').get('Pixels').get('SizeY')
-        X = img.ome_metadata.get('Image').get('Pixels').get('SizeX')
+        T, Z, Y, X = get_dimensions(img, time=False)
 
         # Convert image stack to image sequence (1 image per time point)
         img_to_seq(reffile, ctc_gt_seg, "man_seg",X,Y,Z,T)
