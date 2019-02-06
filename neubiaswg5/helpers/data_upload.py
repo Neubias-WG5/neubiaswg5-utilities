@@ -292,7 +292,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
 
     if problemclass == CLASS_OBJSEG or problemclass == CLASS_PIXCLA:
         extract_fn = extract_annotations_objseg
-    elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT:
+    elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT or problemclass == CLASS_LNDDET:
         extract_fn = extract_annotations_objdet
     elif problemclass == CLASS_LOOTRC:
         extract_fn = extract_annotations_lootrc
