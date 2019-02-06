@@ -221,9 +221,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Initialize metrics arrays
         maxlbl = np.maximum(np.amax(True_Data),np.amax(Pred_Data))
-        N_REF = np.array([maxlbl,1])
-        N_PRED = np.array([maxlbl,1])
-        MRE = np.array([maxlbl,1],dtype='float')
+        N_REF = np.zeros([maxlbl, 1])
+        N_PRED = np.zeros([maxlbl, 1])
+        MRE = np.zeros([maxlbl, 1], dtype='float')
 
         # Per class loop
         for i in range(maxlbl):
