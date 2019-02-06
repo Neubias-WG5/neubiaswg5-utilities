@@ -220,10 +220,10 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         True_Data = True_ImFile.asarray()
 
         # Initialize metrics arrays
-        maxlbl = np.maximum(np.amax(True_Data),np.amax(Pred_Data))
-        N_REF = np.zeros([maxlbl, 1])
-        N_PRED = np.zeros([maxlbl, 1])
-        MRE = np.zeros([maxlbl, 1], dtype='float')
+        maxlbl = np.union1d(np.unique(True_Data), np.unique(Pred_Data)).shape[0]
+        N_REF = np.zeros([maxlbl])
+        N_PRED = np.zeros([maxlbl])
+        MRE = np.zeros([maxlbl], dtype='float')
 
         # Per class loop
         for i in range(maxlbl):
