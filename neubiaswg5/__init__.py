@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__version__ = "0.5.3a"
+__version__ = "0.5.5"
 
 from .problemclass import *
 
