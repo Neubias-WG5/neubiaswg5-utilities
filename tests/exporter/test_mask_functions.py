@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import numpy as np
+from skimage.io import imsave
 
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d
 from shapely.geometry import Polygon, box, LineString
@@ -200,11 +201,11 @@ class TestSkeletonMaskToObject(TestCase):
 
         slices = sorted(slices, key=lambda s: s[0].label)
 
-        self.assertEqual(5, len(slices[0]))
+        self.assertEqual(1, len(slices[0]))
         self.assertEqual(63, slices[0][0].label)
-        self.assertEqual(25, len(slices[1]))
+        self.assertEqual(21, len(slices[1]))
         self.assertEqual(127, slices[1][0].label)
-        self.assertEqual(25, len(slices[2]))
+        self.assertEqual(21, len(slices[2]))
         self.assertEqual(255, slices[2][0].label)
 
     def testSkeletonMask3DProjection(self):
@@ -212,4 +213,4 @@ class TestSkeletonMaskToObject(TestCase):
         image[:, :, 15] = draw_linestring(image[:, :, 15], LineString([(5, 5), (25, 25)]))
         slices = skeleton_mask_to_objects_3d(image, assume_unique_labels=True, projection=3)
         self.assertEqual(1, len(slices))
-        self.assertEqual(11, len(slices[0]))
+        self.assertEqual(7, len(slices[0]))

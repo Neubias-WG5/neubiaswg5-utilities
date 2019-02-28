@@ -1,5 +1,7 @@
 from skimage import morphology
 import numpy as np
+from skimage.io import imsave
+
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d
 
 
@@ -31,7 +33,9 @@ def skeleton_mask_to_objects_3d(mask, background=0, offset=None, assume_unique_l
         Number of nearby frames to project in the current one. -1 for projecting from the whole volume.
         0 for no projection at all (default)
     """
-    dilated = morphology.dilation(mask, selem=morphology.disk(1))
+    selem = np.ones([3, 3, 1], dtype=np.bool)
+    selem[:, :, 0] = morphology.disk(1)
+    dilated = morphology.dilation(mask, selem=selem)
 
     # projection of skeleton from nearby frames
     if projection != 0:
