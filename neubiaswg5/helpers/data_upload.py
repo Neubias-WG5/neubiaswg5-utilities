@@ -234,7 +234,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
     return collection
 
 
-def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, is_2d=True, projection=0, **kwargs):
     """
     Parameters
     ----------
@@ -243,6 +243,8 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
     project_id: int
     upload_group_id: bool
     is_2d: bool
+    projection: int
+        Projection of the skeleton
     kwargs: dict
     """
     image = in_image.object
@@ -253,7 +255,7 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
     collection = mask_convert(
         data, image, project_id,
         mask_2d_fn=skeleton_mask_to_objects_2d,
-        mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
+        mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True, projection=projection),
         upload_group_id=upload_group_id
     )
     return collection
