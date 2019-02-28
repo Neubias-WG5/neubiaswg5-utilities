@@ -31,7 +31,7 @@ def skeleton_mask_to_objects_3d(mask, background=0, offset=None, assume_unique_l
         Number of nearby frames to project in the current one. -1 for projecting from the whole volume.
         0 for no projection at all (default)
     """
-    dilated = morphology.dilation(mask, selem=morphology.ball(1))
+    dilated = morphology.dilation(mask, selem=morphology.disk(1))
 
     # projection of skeleton from nearby frames
     if projection != 0:
