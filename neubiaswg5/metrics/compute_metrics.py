@@ -24,6 +24,7 @@ import os
 import re
 import shutil
 import sys
+import subprocess 
 
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
@@ -147,6 +148,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
     elif problemclass == CLASS_TRETRC:
 
         pass
+        # to be uncommented when support to .swc files is enabled in _computemetrics
+        #command = "java -jar DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
+        #return_code = subprocess.call(command, shell=True, cwd="/app")  # waits for the subprocess to return
 
     elif problemclass == CLASS_LOOTRC:
 
