@@ -79,7 +79,7 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, verbose=True, **ext
 def get_dimensions(tiff, time=False):
     array = tiff.asarray()
     T, Z = 1, 1
-    if array.dim > 2:
+    if array.ndim > 2:
         pixels = tiff.ome_metadata.get('Image').get('Pixels')
         Y, X = pixels.get('SizeY'), pixels.get('SizeX')
 
@@ -91,6 +91,7 @@ def get_dimensions(tiff, time=False):
         Y, X = array.shape
 
     return T, Z, Y, X
+
 
 def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
     # Remove all xml and txt (temporary) files in tmpfolder
