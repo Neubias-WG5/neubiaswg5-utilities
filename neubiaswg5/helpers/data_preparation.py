@@ -23,7 +23,7 @@ def get_file_name(path):
     return os.path.basename(path).rsplit(".", 1)[0]
 
 
-def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
+def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True, ignore_missing_gt=False):
     """
     If do_download is true: download input and ground truth images to in_path and gt_path respectively, and return the
     corresponding ImageInstance or ImageGroup objects.
@@ -43,6 +43,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         True for actually downloading the image, False for getting them from in_path and gt_path
     is_2d: bool
         True for 2d images
+    ignore_missing_gt: bool
+        If False, an exception is raised when a ground truth images is missing. Otherwise, just skip download
 
     Returns
     -------
@@ -73,6 +75,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         related_name = gt_image.original_filename.replace(gt_suffix, "")
         related_image = images.find_by_attribute(gt_image.filename_attribute, related_name)
         if related_image is None:
+            if ignore_missing_gt:
+                continue
             raise ValueError("Missing ground truth image for label image {}".format(image.id))
         gt_image = input_class(image, gt_path, "{}.tif".format(related_image.id))
         gt_images.append(gt_image)
@@ -119,7 +123,7 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
 
 
 def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
-                 outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, **kwargs):
+                 outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, ignore_missing_gt=False, **kwargs):
     """Prepare data from parameters.
 
     If nodownload is false, creates four folders in `base_path`:
@@ -156,6 +160,8 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
         Name (not the path) for temporary data folder.
     is_2d: bool
         True if the problem is a 2d one, False otherwise (3D, 4D, 3D+t).
+    ignore_missing_gt: bool
+        If False, an exception is raised when a ground truth images is missing. Otherwise, just skip download
     kwargs: dict
         For CLASS_TRETRC:
             - suffix: suffix in the filename for attached files (by default "_attached")
@@ -194,12 +200,13 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     makedirs_ifnotexists(tmp_path)
 
     # in all cases download input and gt
-    in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix, do_download=do_download)
+    in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix,
+                                       do_download=do_download, ignore_missing_gt=ignore_missing_gt)
 
     # download additional data
     if problemclass == CLASS_TRETRC:
         suffix = kwargs.get("suffix", "_attached")
-        download_attached(in_data, in_path, suffix=suffix, do_download=do_download)
+        download_attached(in_data, gt_path, suffix=suffix, do_download=do_download)
     elif problemclass == CLASS_OBJTRK:
         raise NotImplementedError("Problemclass '{}' needs additional data. Download of this "
                                   "data hasn't been implemented yet".format(problemclass))
