@@ -160,7 +160,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # and finally removes any spaces. 
         # diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
 
-        #metrics_dict["DIADEM"] = float(diadem)
+        #metrics_dict["DM"] = float(diadem)
     elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
