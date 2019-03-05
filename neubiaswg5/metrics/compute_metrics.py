@@ -148,10 +148,15 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
     elif problemclass == CLASS_TRETRC:
 
         pass
-        # to be uncommented when support to .swc files is enabled in _computemetrics
-        #command = "java -jar DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
-        #return_code = subprocess.call(command, shell=True, cwd="/app")  # waits for the subprocess to return
+        # TODO uncomment when support to .swc files is enabled in compute_metrics
+        # command = "java -jar /usr/bin/DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
+        # run_metric = subprocess.run(command, shell=True, stdout = subprocess.PIPE)  
+        # Gets output result which looks like this 'b'Score: 0\n'
+        # first splits by :, then splits by \\ to get the number 
+        # and finally removes any spaces. 
+        # diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
 
+        #metrics_dict["DIADEM"] = float(diadem)
     elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
