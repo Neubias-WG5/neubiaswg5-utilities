@@ -9,9 +9,8 @@ with open("README.md", "r") as fh:
 
 
 if sys.version_info[0] == 3:
-    # TODO fix version of tifffile once PACKBITS bug is fixed
     packages = [
-        'scipy>=1.0,<=1.2', 'tifffile', 'scikit-image>=0.14.0,<=0.14.2', 'scikit-learn>=0.17,<=0.20.2',
+        'scipy>=1.0,<=1.2', 'tifffile>=2019.2.22', 'scikit-image>=0.14.0,<=0.14.2', 'scikit-learn>=0.17,<=0.20.2',
         'pandas>=0.20,<=0.24.1', 'numpy>=0.14,<=1.15.4', 'opencv-python-headless>=4,<=4.0.0.21',
         'shapely>=1.6,<=1.7a1', 'skan>=0.7,<=0.7.1', 'numba>=0.40,<=0.42.0',
         'imageio>=2,<=2.4.1'
