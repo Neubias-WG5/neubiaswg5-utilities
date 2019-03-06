@@ -151,10 +151,14 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     elif problemclass == CLASS_TRETRC:
 
-        pass
+        # infile is a path to the output .swc
+        # reffile is a path to the reference .swc
+
         # to be uncommented when support to .swc files is enabled in _computemetrics
-        #command = "java -jar DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
-        #return_code = subprocess.call(command, shell=True, cwd="/app")  # waits for the subprocess to return
+        # command = "java -jar DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
+        # return_code = subprocess.call(command, shell=True, cwd="/app")  # waits for the subprocess to return
+
+        pass
 
     elif problemclass == CLASS_LOOTRC:
 
@@ -262,7 +266,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # Call tracking metric code
         gating_dist = extra_params.get("gating_dist", 5)
         # the fourth parameter represents the gating distance
-        #os.system('java -jar bin/win/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
         os.system('java -jar /usr/bin/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
 
         # Parse the output file created automatically in tmpfolder
@@ -290,7 +293,11 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         os.mkdir(ctc_res_folder)
 
         # Read metadata from reference image (OME-TIFF)
-        img = tiff.TiffFile(reffile)
+        # for 'ObjTrk', infile and reffile are tuples
+        ref_imgfile, ref_txtfile = reffile
+        in_imgfile, in_txtfile = infile
+
+        img = tiff.TiffFile(ref_imgfile)
         T, Z, Y, X = get_dimensions(img, time=False)
 
         # Convert image stack to image sequence (1 image per time point)
@@ -299,19 +306,15 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         img_to_seq(infile, ctc_res_folder, "mask",X,Y,Z,T)
 
         # Copy the track text files into the created folders
-        ref_txt_file = reffile[:reffile.find('.')]+".txt"
-        in_txt_file = infile[:infile.find('.')]+".txt"
-        shutil.copy2(ref_txt_file, os.path.join(ctc_gt_tra, "man_track.txt"))
-        shutil.copy2(in_txt_file, os.path.join(ctc_res_folder, "res_track.txt"))
+        shutil.copy2(ref_txtfile, os.path.join(ctc_gt_tra, "man_track.txt"))
+        shutil.copy2(in_txtfile, os.path.join(ctc_res_folder, "res_track.txt"))
 
         # Run the evaluation routines
         measure_fname = os.path.join(tmpfolder, "measures.txt")
-        #os.system("SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
-        #os.system("TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
         os.system("/usr/bin/SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
         os.system("/usr/bin/TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
 
-        #Parse the output file with the measured scores
+        # Parse the output file with the measured scores
         with open(measure_fname, "r") as f:
             bchmetrics = [line.split(':')[1].strip() for line in f.readlines()]
 
