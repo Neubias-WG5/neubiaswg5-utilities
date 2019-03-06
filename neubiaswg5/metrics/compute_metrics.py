@@ -76,20 +76,23 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, verbose=True, **ext
     return outputs
 
 
+def get_image_metadata(tiff):
+    import xml.etree.ElementTree as ET
+    return list(list(ET.fromstring(tiff.ome_metadata))[0])[0].attrib
+
+
 def get_dimensions(tiff, time=False):
     array = tiff.asarray()
     T, Z = 1, 1
     if array.ndim > 2:
-        pixels = tiff.ome_metadata.get('Image').get('Pixels')
-        Y, X = pixels.get('SizeY'), pixels.get('SizeX')
-
-        if array.dim > 3 or time:
-            T = pixels.get('SizeT')
-        if array.dim > 3 or not time:
-            Z = pixels.get('SizeZ')
+        metadata = get_image_metadata(tiff)
+        Y, X = int(metadata['SizeY']), int(metadata['SizeX'])
+        if array.ndim > 3 or time:
+            T = int(metadata['SizeT'])
+        if array.ndim > 3 or not time:
+            Z = int(metadata['SizeZ'])
     else:
         Y, X = array.shape
-
     return T, Z, Y, X
 
 
