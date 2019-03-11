@@ -20,6 +20,10 @@ def check_field(d, f, target="dictionary"):
     return d[f]
 
 
+def split_filename(filename):
+    return filename.rsplit(".", 1)
+
+
 class NeubiasInput(metaclass=ABCMeta):
     """A neubias input is a file that is used as input of a workflow (either ground truth or actual input).
     This class provides utilities methods for manipulating the input images
@@ -38,12 +42,20 @@ class NeubiasInput(metaclass=ABCMeta):
     @property
     @abstractmethod
     def filename(self):
+        """
+        Returns
+        -------
+        str
+        """
         pass
 
     @property
-    @abstractmethod
     def extension(self):
-        pass
+        return split_filename(self.filename)[1]
+
+    @property
+    def filename_no_extension(self):
+        return split_filename(self.filename)[0]
 
     @property
     def object(self):
@@ -69,32 +81,27 @@ class NeubiasCytomineInput(NeubiasInput):
         return os.path.join(self._in_path, self.filename)
 
     @property
-    def extension(self):
-        return self.filename.rsplit(".", 1)[1]
-
-    @property
     def original_filename(self):
         return getattr(self.object, self.filename_attribute)
 
     @property
     @abstractmethod
     def filename_attribute(self):
+        """
+        Returns
+        -------
+        attr: str
+        """
         pass
 
 
 class NeubiasImageInstance(NeubiasCytomineInput):
-    def __init__(self, image_instance, in_path="", name_pattern="{id}.tif"):
-        super().__init__(image_instance, in_path, name_pattern)
-
     @property
     def filename_attribute(self):
         return "originalFilename"
 
 
 class NeubiasImageGroup(NeubiasCytomineInput):
-    def __init__(self, image_group, in_path="", name_pattern="{id}.tif"):
-        super().__init__(image_group, in_path, name_pattern)
-
     @property
     def filename_attribute(self):
         return "name"
@@ -112,14 +119,9 @@ class NeubiasFilepath(NeubiasInput):
     def filename(self):
         return os.path.basename(self.filepath)
 
-    @property
-    def extension(self):
-        return self.filename.rsplit(".", 1)[1]
-
 
 class NeubiasAttachedFile(NeubiasCytomineInput):
-
-    def __init__(self, attached_file, in_path="", name_pattern="{filename}"):
+    def __init__(self, attached_file, in_path="", name_pattern="{filename}"):  # change default pattern
         super().__init__(attached_file, in_path, name_pattern)
 
     @property
