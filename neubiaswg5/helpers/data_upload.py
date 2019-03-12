@@ -34,8 +34,12 @@ def change_referential(p, height):
     return affine_transform(p, [1, 0, 0, -1, 0, height])
 
 
-def get_group_id_dict(label):
+def get_group_id_property(label):
     return {"key": "ANNOTATION_GROUP_ID", "value": label}
+
+
+def get_default_color_property(color="#ff0000"):
+    return {"key": "CUSTOM_ANNOTATION_DEFAULT_COLOR", "value": color}
 
 
 def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_project, label=None, upload_group_id=False):
@@ -53,7 +57,9 @@ def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_pro
         "id_project": id_project
     }
     if upload_group_id:
-        parameters["property"] = [get_group_id_dict(slice.label if label is None else label)]
+        parameters["property"] = [get_group_id_property(slice.label if label is None else label)]
+    else:
+        parameters["property"] = [get_default_color_property()]
     return Annotation(**parameters)
 
 
@@ -228,7 +234,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
                 "id_project": project_id
             }
             if upload_group_id:
-                annotation_params["property"] = [get_group_id_dict(_slice.label)]
+                annotation_params["property"] = [get_group_id_property(_slice.label)]
             collection.append(Annotation(**annotation_params))
 
     return collection
