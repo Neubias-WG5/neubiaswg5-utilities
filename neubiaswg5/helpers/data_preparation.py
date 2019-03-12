@@ -79,7 +79,7 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         gt_images.append(gt_image)
 
     for img in (in_images + gt_images):
-        img.object.download(img.filepath, parent=True)
+        img.object.download(img.filepath, parent=True, override=False)
 
     return in_images, gt_images
 
