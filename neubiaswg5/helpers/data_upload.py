@@ -130,6 +130,31 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     )
 
 
+def extract_annotations_pixcla(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
+    """
+    Parameters
+    ----------
+    out_path: str
+    in_image: NeubiasCytomineInput
+    project_id: int
+    upload_group_id: bool
+        True for uploading annotation group id
+    is_2d: bool
+    kwargs: dict
+    """
+    image = in_image.object
+    file = "{}.tif".format(image.id)
+    path = os.path.join(out_path, file)
+    data = imread(path, is_2d=is_2d)
+
+    return mask_convert(
+        data, image, project_id,
+        mask_2d_fn=mask_to_objects_2d,
+        mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=False),
+        upload_group_id=upload_group_id
+    )
+
+
 def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, generate_mask=False, in_path=None,
                                result_file_suffix=".tif", has_headers=False, parse_fn=None, upload_group_id=False, is_2d=True, **kwargs):
     """
@@ -298,8 +323,10 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
     if monitor_params is None:
         monitor_params = dict()
 
-    if problemclass == CLASS_OBJSEG or problemclass == CLASS_PIXCLA:
+    if problemclass == CLASS_OBJSEG:
         extract_fn = extract_annotations_objseg
+    elif problemclass == CLASS_PIXCLA:
+        extract_fn = extract_annotations_pixcla
     elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT or problemclass == CLASS_LNDDET:
         extract_fn = extract_annotations_objdet
     elif problemclass == CLASS_LOOTRC:
