@@ -84,7 +84,7 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
     return in_images, gt_images
 
 
-def download_attached(inputs, path, suffix="_attached", do_download=False):
+def download_attached(inputs, path, suffix="_attached", do_download=False, ignore_missing_gt=False):
     """
     Download the most recent attached file for each input.
     If do_download is False, then the attached file must have the same name (without extension) as the corresponding
@@ -100,6 +100,10 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
         if do_download:
             # extract most recent file
             files = AttachedFileCollection(image).fetch()
+            if len(files) == 0:
+                if ignore_missing_gt:
+                    continue
+                raise ValueError("Missing ground truth attached file for input image '{}'.".format(in_image.filename))
             most_recent = sorted(files.data(), key=lambda f: int(f.created), reverse=True)[0]
 
             # download the last file
@@ -109,6 +113,8 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
             image_name = os.path.basename(image).rsplit(".")[0]
             attached_name = "{}".format(image_name, suffix)
             if attached_name not in existing_files:
+                if ignore_missing_gt:
+                    continue
                 raise FileNotFoundError("Missing attached file for input image '{}'.".format(image))
             attached_file = NeubiasFilepath(os.path.join(
                 path, "{}{}".format(attached_name, existing_extensions[attached_name])
@@ -193,6 +199,9 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     makedirs_ifnotexists(gt_path)
     makedirs_ifnotexists(tmp_path)
 
+    # when metrics are ignored, we can ignore ground truth download
+    ignore_missing_gt = ignore_missing_gt or not kwargs.get("do_compute_metrics", True)
+
     # in all cases download input and gt
     in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix,
                                        do_download=do_download, ignore_missing_gt=ignore_missing_gt)
@@ -200,7 +209,7 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     # download additional data
     if problemclass == CLASS_TRETRC:
         suffix = kwargs.get("suffix", "_attached")
-        download_attached(in_data, gt_path, suffix=suffix, do_download=do_download)
+        download_attached(in_data, gt_path, suffix=suffix, do_download=do_download, ignore_missing_gt=ignore_missing_gt)
     elif problemclass == CLASS_OBJTRK:
         raise NotImplementedError("Problemclass '{}' needs additional data. Download of this "
                                   "data hasn't been implemented yet".format(problemclass))
