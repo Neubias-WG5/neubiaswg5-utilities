@@ -4,12 +4,42 @@ import os
 from cytomine import CytomineJob
 from cytomine.models import Project
 
+from neubiaswg5 import CLASS_TRETRC, CLASS_OBJTRK
 from neubiaswg5.helpers.cytomine_metrics import MetricCollection, get_metric_result_collection, get_metric_result
 from neubiaswg5.metrics import computemetrics_batch
 
 
+def get_compute_mode(problemclass):
+    """Check which type of files should be used for computing the metrics for the given problemclass.
+
+    Parameters
+    ----------
+    problemclass: str
+        The problem class
+
+    Returns
+    -------
+    use_mask: bool
+        True if should use a mask
+    use_attached: bool
+        True if should use an attached file
+    """
+    if problemclass == CLASS_OBJTRK:  # use both files
+        return True, True
+    elif problemclass == CLASS_TRETRC:
+        return False, True
+    else:  # only mask by default
+        return True, False
+
+
+def check_file(filepath, message):
+    if not os.path.isfile(filepath):
+        raise ValueError("File '{}' missing: {}".format(filepath, message))
+    return filepath
+
+
 def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric_params=None,
-                   do_compute_metrics=False, gt_inputs=None, **kwargs):
+                   do_compute_metrics=False, **kwargs):
     """Upload each sample will get a value for each metrics of the given problemclass
     Parameters
     ----------
@@ -29,9 +59,6 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
         Additional parameters for metric computation (forwarded to computemetrics or computemetrics_batch directly)
     do_compute_metrics: bool
         Whether or not to compute and upload the metrics.
-    gt_inputs: list|None
-        If there is a mismatch between file format of input and ground truth, the ground truth inputs should be passed
-        through this parameter.
     """
     if not do_compute_metrics:
         return
@@ -41,18 +68,27 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     if metric_params is None:
         metric_params = dict()
 
-    # get image names
-    outfiles, reffiles = zip(*[
-        (os.path.join(out_path, in_image.filename),
-         os.path.join(gt_path, in_image.filename))
-        for in_image in (inputs if gt_inputs is None else gt_inputs)
-    ])
+    use_mask, use_attached = get_compute_mode(problemclass)
 
-    # check that output files exist
-    for outfile, reffile in zip(outfiles, reffiles):
-        if not os.path.isfile(outfile):
-            raise FileNotFoundError("There should be one output file for each ground truth file."
-                                    "Output file '{}' for reference file '{}' does not exist.".format(outfile, reffiles))
+    # list files to be used for computing metrics
+    outfiles, reffiles = list(), list()
+    for i, in_image in enumerate(inputs):
+        out, gt = [], []
+        if use_mask:
+            out.append(check_file(os.path.join(out_path, in_image.filename), "an output mask is expected for input image '{}'".format(in_image.filename)))
+            gt.append(check_file(os.path.join(gt_path, in_image.filename), "an ground truth mask is expected for input image '{}'".format(in_image.filename)))
+        if use_attached:
+            if len(in_image.attached) == 0:
+                raise ValueError("No attached file found although attached files were selected for computing metrics.")
+            out.append(check_file(os.path.join(out_path, in_image.attached[0].filename), "an output file is expected for input image '{}'".format(in_image.filename)))
+            gt.append(check_file(os.path.join(gt_path, in_image.attached[0].filename), "an ground truth file is expected for input image '{}'".format(in_image.filename)))
+
+        if len(out) > 1:  # use both mask and attached
+            outfiles.append(out)
+            reffiles.append(gt)
+        else:  # use only one type of file
+            outfiles.append(out[0])
+            reffiles.append(gt[0])
 
     results, params = computemetrics_batch(outfiles, reffiles, problemclass, tmp_path, **metric_params)
 

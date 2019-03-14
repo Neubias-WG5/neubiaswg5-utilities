@@ -34,8 +34,12 @@ def change_referential(p, height):
     return affine_transform(p, [1, 0, 0, -1, 0, height])
 
 
-def get_group_id_dict(label):
+def get_group_id_property(label):
     return {"key": "ANNOTATION_GROUP_ID", "value": label}
+
+
+def get_default_color_property(color="#ff0000"):
+    return {"key": "CUSTOM_ANNOTATION_DEFAULT_COLOR", "value": color}
 
 
 def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_project, label=None, upload_group_id=False):
@@ -53,7 +57,9 @@ def annotation_from_slice(slice: AnnotationSlice, id_image, image_height, id_pro
         "id_project": id_project
     }
     if upload_group_id:
-        parameters["property"] = [get_group_id_dict(slice.label if label is None else label)]
+        parameters["property"] = [get_group_id_property(slice.label if label is None else label)]
+    else:
+        parameters["property"] = [get_default_color_property()]
     return Annotation(**parameters)
 
 
@@ -120,6 +126,31 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
         data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
         mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
+        upload_group_id=upload_group_id
+    )
+
+
+def extract_annotations_pixcla(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
+    """
+    Parameters
+    ----------
+    out_path: str
+    in_image: NeubiasCytomineInput
+    project_id: int
+    upload_group_id: bool
+        True for uploading annotation group id
+    is_2d: bool
+    kwargs: dict
+    """
+    image = in_image.object
+    file = "{}.tif".format(image.id)
+    path = os.path.join(out_path, file)
+    data = imread(path, is_2d=is_2d)
+
+    return mask_convert(
+        data, image, project_id,
+        mask_2d_fn=mask_to_objects_2d,
+        mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=False),
         upload_group_id=upload_group_id
     )
 
@@ -228,7 +259,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
                 "id_project": project_id
             }
             if upload_group_id:
-                annotation_params["property"] = [get_group_id_dict(_slice.label)]
+                annotation_params["property"] = [get_group_id_property(_slice.label)]
             collection.append(Annotation(**annotation_params))
 
     return collection
@@ -292,8 +323,10 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
     if monitor_params is None:
         monitor_params = dict()
 
-    if problemclass == CLASS_OBJSEG or problemclass == CLASS_PIXCLA:
+    if problemclass == CLASS_OBJSEG:
         extract_fn = extract_annotations_objseg
+    elif problemclass == CLASS_PIXCLA:
+        extract_fn = extract_annotations_pixcla
     elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT or problemclass == CLASS_LNDDET:
         extract_fn = extract_annotations_objdet
     elif problemclass == CLASS_LOOTRC:

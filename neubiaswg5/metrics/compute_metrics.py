@@ -41,6 +41,8 @@ from .img_to_xml import *
 from .img_to_seq import *
 from .skl2obj import *
 from .netmets_obj import netmets_obj
+from .node_sorter import swc_node_sorter
+from .node_sorter import findchildren
 
 
 def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, verbose=True, **extra_params):
@@ -150,17 +152,21 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict["RE"] = recall_score(y_true, y_pred, labels=None, average='weighted')
 
     elif problemclass == CLASS_TRETRC:
+  
+        # infile is a path to the output .swc
+        # reffile is a path to the reference .swc
 
-        pass
-        # TODO uncomment when support to .swc files is enabled in compute_metrics
-        # command = "java -jar /usr/bin/DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
-        # run_metric = subprocess.run(command, shell=True, stdout = subprocess.PIPE)  
+        # call node_sorter functions to order swc and saves it with the same name and path
+        swc_node_sorter(infile)
+        # run diadem metric
+        command = "java -jar /usr/bin/DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
+        run_metric = subprocess.run(command, shell=True, stdout = subprocess.PIPE)
         # Gets output result which looks like this 'b'Score: 0\n'
-        # first splits by :, then splits by \\ to get the number 
-        # and finally removes any spaces. 
-        # diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
+        # first splits by :, then splits by \\ to get the number
+        # and finally removes any spaces.
+        diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
+        metrics_dict["DM"] = float(diadem)
 
-        #metrics_dict["DM"] = float(diadem)
     elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
@@ -267,7 +273,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # Call tracking metric code
         gating_dist = extra_params.get("gating_dist", 5)
         # the fourth parameter represents the gating distance
-        #os.system('java -jar bin/win/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
         os.system('java -jar /usr/bin/TrackingPerformance.jar -r ' + ref_xml_fname + ' -c ' + in_xml_fname + ' -o ' + res_fname + ' ' + str(gating_dist))
 
         # Parse the output file created automatically in tmpfolder
@@ -295,7 +300,11 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         os.mkdir(ctc_res_folder)
 
         # Read metadata from reference image (OME-TIFF)
-        img = tiff.TiffFile(reffile)
+        # for 'ObjTrk', infile and reffile are tuples
+        ref_imgfile, ref_txtfile = reffile
+        in_imgfile, in_txtfile = infile
+
+        img = tiff.TiffFile(ref_imgfile)
         T, Z, Y, X = get_dimensions(img, time=False)
 
         # Convert image stack to image sequence (1 image per time point)
@@ -304,19 +313,15 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         img_to_seq(infile, ctc_res_folder, "mask",X,Y,Z,T)
 
         # Copy the track text files into the created folders
-        ref_txt_file = reffile[:reffile.find('.')]+".txt"
-        in_txt_file = infile[:infile.find('.')]+".txt"
-        shutil.copy2(ref_txt_file, os.path.join(ctc_gt_tra, "man_track.txt"))
-        shutil.copy2(in_txt_file, os.path.join(ctc_res_folder, "res_track.txt"))
+        shutil.copy2(ref_txtfile, os.path.join(ctc_gt_tra, "man_track.txt"))
+        shutil.copy2(in_txtfile, os.path.join(ctc_res_folder, "res_track.txt"))
 
         # Run the evaluation routines
         measure_fname = os.path.join(tmpfolder, "measures.txt")
-        #os.system("SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
-        #os.system("TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
         os.system("/usr/bin/SEGMeasure " + tmpfolder + " 01 >> " + measure_fname)
         os.system("/usr/bin/TRAMeasure " + tmpfolder + " 01 >> " + measure_fname)
 
-        #Parse the output file with the measured scores
+        # Parse the output file with the measured scores
         with open(measure_fname, "r") as f:
             bchmetrics = [line.split(':')[1].strip() for line in f.readlines()]
 

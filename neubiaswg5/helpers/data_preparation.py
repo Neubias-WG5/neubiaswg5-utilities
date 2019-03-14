@@ -6,7 +6,7 @@ from cytomine.models import ImageInstanceCollection, ImageGroupCollection, Attac
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
 from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasImageInstance, NeubiasImageGroup, \
-    NeubiasFilepath, NeubiasAttachedFile
+    NeubiasFilepath, NeubiasAttachedFile, split_filename
 
 
 def get_file_extension(path):
@@ -23,7 +23,7 @@ def get_file_name(path):
     return os.path.basename(path).rsplit(".", 1)[0]
 
 
-def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True):
+def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True, ignore_missing_gt=False):
     """
     If do_download is true: download input and ground truth images to in_path and gt_path respectively, and return the
     corresponding ImageInstance or ImageGroup objects.
@@ -43,6 +43,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         True for actually downloading the image, False for getting them from in_path and gt_path
     is_2d: bool
         True for 2d images
+    ignore_missing_gt: bool
+        If False, an exception is raised when a ground truth images is missing. Otherwise, just skip download
 
     Returns
     -------
@@ -61,32 +63,28 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
     collection_class = ImageInstanceCollection if is_2d else ImageGroupCollection
     input_class = NeubiasImageInstance if is_2d else NeubiasImageGroup
 
+    filename_pattern = "{id}.tif"
     nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
     images = collection_class().fetch_with_filter("project", nj.parameters.cytomine_id_project)
-    in_images = [input_class(i, in_path, "{id}.tif") for i in images if gt_suffix not in input_class(i).original_filename]
+    in_images = [input_class(i, in_path, filename_pattern) for i in images if gt_suffix not in input_class(i).original_filename]
+    filename_to_image = {i.originalFilename: i for i in images}
 
     gt_images = list()
-    for image in images:
-        gt_image = input_class(image)
-        if gt_suffix not in gt_image.original_filename:
-            continue
-        related_name = gt_image.original_filename.replace(gt_suffix, "")
-        related_image = images.find_by_attribute(gt_image.filename_attribute, related_name)
-        if related_image is None:
-            raise ValueError("Missing ground truth image for label image {}".format(image.id))
-        gt_image = input_class(image, gt_path, "{}.tif".format(related_image.id))
+    for in_image in in_images:
+        name, ext = split_filename(in_image.original_filename)
+        gt_filename = name + gt_suffix + "." + ext
+        if gt_filename not in filename_to_image and not ignore_missing_gt:
+            raise ValueError("Missing ground truth image '{}' for input image '{}' (id:{}).".format(gt_filename, in_image.filename, in_image.object.id))
+        gt_image = input_class(filename_to_image[gt_filename], gt_path, filename_pattern.format(id=in_image.object.id))
         gt_images.append(gt_image)
 
-    for in_image in in_images:
-        in_image.object.download(in_image.filepath, parent=True)
-
-    for gt_image in gt_images:
-        gt_image.object.download(gt_image.filepath, parent=True)
+    for img in (in_images + gt_images):
+        img.object.download(img.filepath, parent=True, override=False)
 
     return in_images, gt_images
 
 
-def download_attached(inputs, path, suffix="_attached", do_download=False):
+def download_attached(inputs, path, suffix="_attached", do_download=False, ignore_missing_gt=False):
     """
     Download the most recent attached file for each input.
     If do_download is False, then the attached file must have the same name (without extension) as the corresponding
@@ -102,6 +100,10 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
         if do_download:
             # extract most recent file
             files = AttachedFileCollection(image).fetch()
+            if len(files) == 0:
+                if ignore_missing_gt:
+                    continue
+                raise ValueError("Missing ground truth attached file for input image '{}'.".format(in_image.filename))
             most_recent = sorted(files.data(), key=lambda f: int(f.created), reverse=True)[0]
 
             # download the last file
@@ -111,6 +113,8 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
             image_name = os.path.basename(image).rsplit(".")[0]
             attached_name = "{}".format(image_name, suffix)
             if attached_name not in existing_files:
+                if ignore_missing_gt:
+                    continue
                 raise FileNotFoundError("Missing attached file for input image '{}'.".format(image))
             attached_file = NeubiasFilepath(os.path.join(
                 path, "{}{}".format(attached_name, existing_extensions[attached_name])
@@ -119,7 +123,7 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
 
 
 def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
-                 outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, **kwargs):
+                 outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, ignore_missing_gt=False, **kwargs):
     """Prepare data from parameters.
 
     If nodownload is false, creates four folders in `base_path`:
@@ -156,6 +160,8 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
         Name (not the path) for temporary data folder.
     is_2d: bool
         True if the problem is a 2d one, False otherwise (3D, 4D, 3D+t).
+    ignore_missing_gt: bool
+        If False, an exception is raised when a ground truth images is missing. Otherwise, just skip download
     kwargs: dict
         For CLASS_TRETRC:
             - suffix: suffix in the filename for attached files (by default "_attached")
@@ -193,13 +199,17 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     makedirs_ifnotexists(gt_path)
     makedirs_ifnotexists(tmp_path)
 
+    # when metrics are ignored, we can ignore ground truth download
+    ignore_missing_gt = ignore_missing_gt or not kwargs.get("do_compute_metrics", True)
+
     # in all cases download input and gt
-    in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix, do_download=do_download)
+    in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix,
+                                       do_download=do_download, ignore_missing_gt=ignore_missing_gt)
 
     # download additional data
     if problemclass == CLASS_TRETRC:
         suffix = kwargs.get("suffix", "_attached")
-        download_attached(in_data, in_path, suffix=suffix, do_download=do_download)
+        download_attached(in_data, gt_path, suffix=suffix, do_download=do_download, ignore_missing_gt=ignore_missing_gt)
     elif problemclass == CLASS_OBJTRK:
         raise NotImplementedError("Problemclass '{}' needs additional data. Download of this "
                                   "data hasn't been implemented yet".format(problemclass))
