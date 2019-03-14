@@ -122,6 +122,6 @@ def swc_node_sorter(swc_file_path):
                 new_swc[row_counter,:] = swc[children_idx_list[i],:]
                 row_counter += 1
     print(new_swc)
-    np.savetxt(swc_file_path[:-4]+'_fixed.swc', new_swc, fmt='%i %i %.2f %.2f %.2f %.2f %i', delimiter=' ')
+    np.savetxt(swc_file_path, new_swc, fmt='%i %i %.2f %.2f %.2f %.2f %i', delimiter=' ')
 
 
