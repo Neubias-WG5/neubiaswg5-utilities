@@ -41,6 +41,8 @@ from .img_to_xml import *
 from .img_to_seq import *
 from .skl2obj import *
 from .netmets_obj import netmets_obj
+from .node_sorter import swc_node_sorter
+from .node_sorter import findchildren
 
 
 def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, verbose=True, **extra_params):
@@ -150,20 +152,20 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict["RE"] = recall_score(y_true, y_pred, labels=None, average='weighted')
 
     elif problemclass == CLASS_TRETRC:
-
+  
         # infile is a path to the output .swc
         # reffile is a path to the reference .swc
 
-        # TODO uncomment when support to .swc files is enabled in compute_metrics
-        # command = "java -jar /usr/bin/DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
-        # run_metric = subprocess.run(command, shell=True, stdout = subprocess.PIPE)
+        # call node_sorter functions to order swc and saves it with the same name and path
+        swc_node_sorter(infile)
+        # run diadem metric
+        command = "java -jar /usr/bin/DiademMetric.jar -G " + infile +" -T " + reffile + "-D 0"
+        run_metric = subprocess.run(command, shell=True, stdout = subprocess.PIPE)
         # Gets output result which looks like this 'b'Score: 0\n'
         # first splits by :, then splits by \\ to get the number
         # and finally removes any spaces.
-        # diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
-        # metrics_dict["DIADEM"] = float(diadem)
-
-        pass
+        diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
+        metrics_dict["DM"] = float(diadem)
 
     elif problemclass == CLASS_LOOTRC:
 
