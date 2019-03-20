@@ -9,18 +9,7 @@ from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, Neubias
     NeubiasFilepath, NeubiasAttachedFile, split_filename
 
 
-def get_file_extension(path):
-    """Return the extension of the file (with .) for the given path. If there is no extension returns an empty string"""
-    filename = os.path.basename(path)
-    if "." not in filename:
-        return ""
-    else:
-        return ".{}".format(filename.rsplit(".", 1)[-1])
-
-
-def get_file_name(path):
-    """Return the filename without extension"""
-    return os.path.basename(path).rsplit(".", 1)[0]
+SUPPORTED_MULTI_EXTENSION = ["ome.tif"]
 
 
 def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True, ignore_missing_gt=False):
@@ -66,17 +55,28 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
     filename_pattern = "{id}.tif"
     nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
     images = collection_class().fetch_with_filter("project", nj.parameters.cytomine_id_project)
-    in_images = [input_class(i, in_path, filename_pattern) for i in images if gt_suffix not in input_class(i).original_filename]
-    filename_to_image = {i.originalFilename: i for i in images}
+    images = [input_class(i, name_pattern=filename_pattern) for i in images]
+    gt_images_to_process = [input_class(i.object) for i in images if gt_suffix in i.original_filename]
+    in_images_to_process = {i.original_filename: i for i in images if gt_suffix not in i.original_filename}
 
+    in_images = list()
     gt_images = list()
-    for in_image in in_images:
-        name, ext = split_filename(in_image.original_filename)
-        gt_filename = name + gt_suffix + "." + ext
-        if gt_filename not in filename_to_image and not ignore_missing_gt:
-            raise ValueError("Missing ground truth image '{}' for input image '{}' (id:{}).".format(gt_filename, in_image.filename, in_image.object.id))
-        gt_image = input_class(filename_to_image[gt_filename], gt_path, filename_pattern.format(id=in_image.object.id))
-        gt_images.append(gt_image)
+    for gt in gt_images_to_process:
+        name, ext = gt.original_filename.rsplit(gt_suffix + ".", 1)
+        in_filename = name + "." + ext
+        if in_filename not in in_images_to_process:
+            raise ValueError("Missing input image '{}' for ground truth image '{}' (id:{}).".format(in_filename, gt.original_filename, gt.object.id))
+        in_object = in_images_to_process[in_filename].object
+        in_images.append(input_class(in_object, in_path, filename_pattern))
+        gt_images.append(input_class(gt.object, gt_path, filename_pattern.format(id=in_object.id)))
+
+    # check that all input images have a ground truth
+    if len(in_images_to_process) != len(in_images):
+        diff = set(in_images_to_process.keys()).difference([i.original_filename for i in in_images])
+        for in_image in diff:
+            if not ignore_missing_gt:
+                raise ValueError("Missing ground truth for input image '{}' (id:{}).".format(in_image.original_filename, in_image.object.id))
+            in_images.append(input_class(in_image.object, in_path, filename_pattern))
 
     for img in (in_images + gt_images):
         img.object.download(img.filepath, parent=True, override=False)
@@ -91,8 +91,13 @@ def download_attached(inputs, path, suffix="_attached", do_download=False):
     input file plus the suffix.
     """
     # if do_download is False, need to scan for existing attached files
-    existing_files = {get_file_name(f) for f in os.listdir(path) if suffix in f}
-    existing_extensions = {get_file_name(f): get_file_extension(f) for f in os.listdir(path) if suffix in f}
+    existing_files, existing_extensions = set(), dict()
+    for f in os.listdir(path):
+        if suffix not in f:
+            continue
+        name, ext = split_filename(f, multi_extension=SUPPORTED_MULTI_EXTENSION)
+        existing_files.add(name)
+        existing_extensions[name] = ext
 
     # get path for all inputs
     for in_image in inputs:
