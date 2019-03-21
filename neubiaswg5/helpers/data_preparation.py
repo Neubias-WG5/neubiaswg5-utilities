@@ -212,11 +212,8 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
                                        do_download=do_download, ignore_missing_gt=ignore_missing_gt)
 
     # download additional data
-    if problemclass == CLASS_TRETRC:
+    if problemclass == CLASS_TRETRC or problemclass == CLASS_OBJTRK:
         suffix = kwargs.get("suffix", "_attached")
         download_attached(in_data, gt_path, suffix=suffix, do_download=do_download, ignore_missing_gt=ignore_missing_gt)
-    elif problemclass == CLASS_OBJTRK:
-        raise NotImplementedError("Problemclass '{}' needs additional data. Download of this "
-                                  "data hasn't been implemented yet".format(problemclass))
 
     return in_data, gt_data, in_path, gt_path, out_path, tmp_path
