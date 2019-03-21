@@ -329,7 +329,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         extract_fn = extract_annotations_pixcla
     elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT or problemclass == CLASS_LNDDET:
         extract_fn = extract_annotations_objdet
-    elif problemclass == CLASS_LOOTRC:
+    elif problemclass == CLASS_LOOTRC or problemclass == CLASS_TRETRC:
         extract_fn = extract_annotations_lootrc
     elif problemclass == CLASS_PRTTRK:
         extract_fn = extract_annotations_prttrk
