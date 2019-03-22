@@ -159,10 +159,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # call node_sorter functions to order swc and saves it with the same name and path
         swc_node_sorter(infile)
 
-        print('infile is: '+ infile)
-        print('reffile is: '+ reffile)
-        print('Finished running .swc node sorter ...')
-    
         # run diadem metric
         command = "java -jar /usr/bin/DiademMetric.jar -G " + infile +" -T " + reffile
         run_metric = subprocess.run(command, shell=True, stdout = subprocess.PIPE)
@@ -170,7 +166,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # first splits by :, then splits by \\ to get the number
         # and finally removes any spaces.
         diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
-        print('Diadem metric score for '+ infile + ' is:' + str(diadem))
         metrics_dict["DM"] = float(diadem)
 
     elif problemclass == CLASS_LOOTRC:
@@ -314,9 +309,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         T, Z, Y, X = get_dimensions(img, time=False)
 
         # Convert image stack to image sequence (1 image per time point)
-        img_to_seq(reffile, ctc_gt_seg, "man_seg",X,Y,Z,T)
-        img_to_seq(reffile, ctc_gt_tra, "man_track",X,Y,Z,T)
-        img_to_seq(infile, ctc_res_folder, "mask",X,Y,Z,T)
+        img_to_seq(ref_imgfile, ctc_gt_seg, "man_seg", X, Y, Z, T)
+        img_to_seq(ref_imgfile, ctc_gt_tra, "man_track", X, Y, Z, T)
+        img_to_seq(in_imgfile, ctc_res_folder, "mask", X, Y, Z, T)
 
         # Copy the track text files into the created folders
         shutil.copy2(ref_txtfile, os.path.join(ctc_gt_tra, "man_track.txt"))
@@ -329,7 +324,11 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Parse the output file with the measured scores
         with open(measure_fname, "r") as f:
-            bchmetrics = [line.split(':')[1].strip() for line in f.readlines()]
+            bchmetrics = list()
+            for line in f.readlines():
+                if ":" not in line:
+                    raise ValueError("Error when computing ObjTrk metrics: '{}'".format(line.strip()))
+                bchmetrics.append(line.split(':')[1].strip())
 
         metric_names = ["SEG", "TRA"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
