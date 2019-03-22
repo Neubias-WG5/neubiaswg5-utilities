@@ -122,7 +122,7 @@ def swc_node_sorter(swc_file_path):
             else:
                 new_swc[row_counter,:] = swc[children_idx_list[i],:]
                 row_counter += 1
-    for row in range(0,nrows):
+    for row in range(290,300):
         print('row '+ str(row))
         print(new_swc[row,:])
 
