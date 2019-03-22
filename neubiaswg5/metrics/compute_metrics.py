@@ -308,9 +308,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         T, Z, Y, X = get_dimensions(img, time=False)
 
         # Convert image stack to image sequence (1 image per time point)
-        img_to_seq(reffile, ctc_gt_seg, "man_seg",X,Y,Z,T)
-        img_to_seq(reffile, ctc_gt_tra, "man_track",X,Y,Z,T)
-        img_to_seq(infile, ctc_res_folder, "mask",X,Y,Z,T)
+        img_to_seq(ref_imgfile, ctc_gt_seg, "man_seg", X, Y, Z, T)
+        img_to_seq(ref_imgfile, ctc_gt_tra, "man_track", X, Y, Z, T)
+        img_to_seq(in_imgfile, ctc_res_folder, "mask", X, Y, Z, T)
 
         # Copy the track text files into the created folders
         shutil.copy2(ref_txtfile, os.path.join(ctc_gt_tra, "man_track.txt"))
@@ -323,7 +323,11 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         # Parse the output file with the measured scores
         with open(measure_fname, "r") as f:
-            bchmetrics = [line.split(':')[1].strip() for line in f.readlines()]
+            bchmetrics = list()
+            for line in f.readlines():
+                if ":" not in line:
+                    raise ValueError("Error when computing ObjTrk metrics: '{}'".format(line.strip()))
+                bchmetrics.append(line.split(':')[1].strip())
 
         metric_names = ["SEG", "TRA"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
