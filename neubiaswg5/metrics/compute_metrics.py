@@ -162,8 +162,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         print('infile is: '+ infile)
         print('reffile is: '+ reffile)
         print('Finished running .swc node sorter ...')
-
-
+    
         # run diadem metric
         command = "java -jar /usr/bin/DiademMetric.jar -G " + infile +" -T " + reffile
         run_metric = subprocess.run(command, shell=True, stdout = subprocess.PIPE)
@@ -171,6 +170,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # first splits by :, then splits by \\ to get the number
         # and finally removes any spaces.
         diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
+        print('Diadem metric score for '+ infile + ' is:' + str(diadem))
         metrics_dict["DM"] = float(diadem)
 
     elif problemclass == CLASS_LOOTRC:

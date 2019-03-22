@@ -111,6 +111,7 @@ def swc_node_sorter(swc_file_path):
         print('children idx list shape')
         print(children_idx_list.shape)
         print('swc shape ')
+        nrows, ncols = swc.shape
         print(swc.shape)
 
         for i in range(0,len(children_idx_list)):
@@ -121,7 +122,8 @@ def swc_node_sorter(swc_file_path):
             else:
                 new_swc[row_counter,:] = swc[children_idx_list[i],:]
                 row_counter += 1
-    print(new_swc)
+    for row in range(0,nrows):
+        print(new_swc[row,:])
     np.savetxt(swc_file_path, new_swc, fmt='%i %i %.2f %.2f %.2f %.2f %i', delimiter=' ')
 
 
