@@ -118,8 +118,7 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
     kwargs: dict
     """
     image = in_image.object
-    file = "{}.tif".format(image.id)
-    path = os.path.join(out_path, file)
+    path = os.path.join(out_path, in_image.filename)
     data = imread(path, is_2d=is_2d)
 
     return mask_convert(
@@ -143,8 +142,7 @@ def extract_annotations_pixcla(out_path, in_image, project_id, upload_group_id=F
     kwargs: dict
     """
     image = in_image.object
-    file = "{}.tif".format(image.id)
-    path = os.path.join(out_path, file)
+    path = os.path.join(out_path, in_image.filename)
     data = imread(path, is_2d=is_2d)
 
     return mask_convert(
@@ -230,8 +228,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
         raise ValueError("Annotation extraction function called with is_2d=True: object tracking should be at least 3D")
 
     image = in_image.object
-    file = "{}.tif".format(image.id)
-    path = os.path.join(out_path, file)
+    path = os.path.join(out_path, in_image.filename)
     data = imread(path, is_2d=is_2d)
 
     if data.ndim != 3:
@@ -265,6 +262,53 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
     return collection
 
 
+def extract_annotations_objtrk(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
+    """
+    out_path: str
+    in_image: NeubiasCytomineInput
+    project_id: int
+    upload_group_id: bool
+    is_2d: bool
+    kwargs: dict
+    """
+    if is_2d:
+        raise ValueError("Annotation extraction function called with is_2d=True: object tracking should be at least 3D")
+
+    image = in_image.object
+    path = os.path.join(out_path, in_image.filename)
+    data = imread(path, is_2d=is_2d)
+
+    if data.ndim != 3:
+        raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
+
+    slices = mask_to_objects_3d(np.moveaxis(data, 0, 2), time=True, assume_unique_labels=True)
+    time_to_image, height = get_image_seq_info(image, time=True)
+
+    collection = AnnotationCollection()
+    for slice_group in slices:
+        sorted_group = sorted(slice_group, key=lambda s: s.time)
+        prev_line = []
+        for _slice in sorted_group:
+            if len(prev_line) == 0 or not prev_line[-1].equals(_slice.polygon):
+                prev_line.append(_slice.polygon.centroid)
+
+            if len(prev_line) == 1:
+                polygon = _slice.polygon.centroid
+            else:
+                polygon = LineString(prev_line)
+
+            # add both segmentation and tracking
+            base_params = {
+                "id_image": time_to_image[_slice.time],
+                "id_project": project_id
+            }
+            if upload_group_id:
+                base_params["property"] = [get_group_id_property(int(_slice.label))]
+            collection.append(Annotation(location=change_referential(polygon, height).wkt, **base_params))
+            collection.append(Annotation(location=change_referential(_slice.polygon, height).wkt, **base_params))
+    return collection
+
+
 def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, is_2d=True, projection=0, **kwargs):
     """
     Parameters
@@ -279,8 +323,7 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
     kwargs: dict
     """
     image = in_image.object
-    file = "{}.tif".format(image.id)
-    path = os.path.join(out_path, file)
+    path = os.path.join(out_path, in_image.filename)
     data = imread(path, is_2d=is_2d)
 
     collection = mask_convert(
@@ -333,6 +376,8 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         extract_fn = extract_annotations_lootrc
     elif problemclass == CLASS_PRTTRK:
         extract_fn = extract_annotations_prttrk
+    elif problemclass == CLASS_OBJTRK:
+        extract_fn = extract_annotations_objtrk
     else:
         raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
 
