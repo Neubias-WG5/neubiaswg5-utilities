@@ -95,7 +95,7 @@ def download_attached(inputs, path, suffix="_attached", do_download=False, ignor
     for f in os.listdir(path):
         if suffix not in f:
             continue
-        name, ext = split_filename(f, multi_extension=SUPPORTED_MULTI_EXTENSION)
+        name, ext = f.rsplit(suffix + ".")
         existing_files.add(name)
         existing_extensions[name] = ext
 
@@ -112,7 +112,9 @@ def download_attached(inputs, path, suffix="_attached", do_download=False, ignor
             most_recent = sorted(files.data(), key=lambda f: int(f.created), reverse=True)[0]
 
             # download the last file
-            attached_file = NeubiasAttachedFile(most_recent, path, name_pattern="{filename}")
+            in_name, _ = split_filename(in_image.filename)
+            _, ext = split_filename(most_recent.filename)
+            attached_file = NeubiasAttachedFile(most_recent, path, name_pattern=in_name + suffix + "." + ext)
             most_recent.download(attached_file.filepath)
         else:
             image_name = os.path.basename(image).rsplit(".")[0]
