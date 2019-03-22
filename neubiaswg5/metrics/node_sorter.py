@@ -97,13 +97,13 @@ def swc_node_sorter(swc_file_path):
     new_swc = np.empty(swc.shape)
 
     # some worflow outputs, such as the one from rivuletpy, have to be fixed
-    # when the node id is its own parent, change parent id to -1 
-    nrows , ncols = swc.shape 
+    # when the node id is its own parent, change parent id to -1
+    nrows , ncols = swc.shape
     for row in range(0,nrows):
         if swc[row,0] == swc[row,6]:
             swc[row,6] = -1
 
-    first_parents = np.isin(swc[:,6],swc[:,0],invert = True) 
+    first_parents = np.isin(swc[:,6],swc[:,0],invert = True)
     first_parents = np.logical_or(first_parents,swc[:,6]==-1)
     parent_indices = np.argwhere(first_parents == 1)
     row_counter = 0
@@ -130,7 +130,6 @@ def swc_node_sorter(swc_file_path):
                 new_swc[row_counter,:] = swc[children_idx_list[i],:]
                 row_counter += 1
     print(new_swc)
-
     np.savetxt(swc_file_path, new_swc, fmt='%i %i %.2f %.2f %.2f %.2f %i', delimiter=' ')
 
 
