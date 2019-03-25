@@ -80,7 +80,8 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
         if use_attached:
             if len(in_image.attached) == 0:
                 raise ValueError("No attached file found although attached files were selected for computing metrics.")
-            out.append(check_file(os.path.join(out_path, in_image.attached[0].filename), "an output file is expected for input image '{}'".format(in_image.filename)))
+            out_filename = in_image.filename_no_extension + "." + in_image.attached[0].extension
+            out.append(check_file(os.path.join(out_path, out_filename), "an output file is expected for input image '{}'".format(in_image.filename)))
             gt.append(check_file(os.path.join(gt_path, in_image.attached[0].filename), "an ground truth file is expected for input image '{}'".format(in_image.filename)))
 
         if len(out) > 1:  # use both mask and attached
