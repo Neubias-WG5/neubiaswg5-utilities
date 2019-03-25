@@ -122,6 +122,8 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
             inds = [m.start() for m in re.finditer("value", data)]
             bchmetrics = [data[ind+7:data.find('"',ind+7)] for ind in inds]
 
+        if len(bchmetrics) < 2:
+            bchmetrics = [0.0, np.nan]
         metric_names = ["DC", "AHD"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
 
