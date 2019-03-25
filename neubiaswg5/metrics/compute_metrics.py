@@ -308,7 +308,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         in_imgfile, in_txtfile = infile
 
         img = tiff.TiffFile(ref_imgfile)
-        T, Z, Y, X = get_dimensions(img, time=False)
+        T, Z, Y, X = get_dimensions(img, time=True)
 
         # Convert image stack to image sequence (1 image per time point)
         img_to_seq(ref_imgfile, ctc_gt_seg, "man_seg", X, Y, Z, T)
