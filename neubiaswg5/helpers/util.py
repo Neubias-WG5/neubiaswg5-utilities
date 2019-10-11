@@ -85,26 +85,8 @@ class NeubiasCytomineInput(NeubiasInput):
         return getattr(self.object, self.filename_attribute)
 
     @property
-    @abstractmethod
-    def filename_attribute(self):
-        """
-        Returns
-        -------
-        attr: str
-        """
-        pass
-
-
-class NeubiasImageInstance(NeubiasCytomineInput):
-    @property
     def filename_attribute(self):
         return "originalFilename"
-
-
-class NeubiasImageGroup(NeubiasCytomineInput):
-    @property
-    def filename_attribute(self):
-        return "name"
 
 
 class NeubiasFilepath(NeubiasInput):

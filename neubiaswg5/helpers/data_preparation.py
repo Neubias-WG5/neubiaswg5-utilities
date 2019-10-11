@@ -1,18 +1,19 @@
 import os
+import warnings
 from pathlib import Path
 
 from cytomine import CytomineJob
 from cytomine.models import ImageInstanceCollection, ImageGroupCollection, AttachedFileCollection
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
-from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasImageInstance, NeubiasImageGroup, \
+from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasCytomineInput, \
     NeubiasFilepath, NeubiasAttachedFile, split_filename
 
 
 SUPPORTED_MULTI_EXTENSION = ["ome.tif"]
 
 
-def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, is_2d=True, ignore_missing_gt=False):
+def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, ignore_missing_gt=False):
     """
     If do_download is true: download input and ground truth images to in_path and gt_path respectively, and return the
     corresponding ImageInstance or ImageGroup objects.
@@ -30,8 +31,6 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         A suffix for ground truth images filename
     do_download: bool
         True for actually downloading the image, False for getting them from in_path and gt_path
-    is_2d: bool
-        True for 2d images
     ignore_missing_gt: bool
         If False, an exception is raised when a ground truth images is missing. Otherwise, just skip download
 
@@ -49,14 +48,11 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         gt_images = [NeubiasFilepath(os.path.join(gt_path, f)) for f in os.listdir(gt_path)]
         return in_images, gt_images
 
-    collection_class = ImageInstanceCollection if is_2d else ImageGroupCollection
-    input_class = NeubiasImageInstance if is_2d else NeubiasImageGroup
-
     filename_pattern = "{id}.tif"
     nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
-    images = collection_class().fetch_with_filter("project", nj.parameters.cytomine_id_project)
-    images = [input_class(i, name_pattern=filename_pattern) for i in images]
-    gt_images_to_process = [input_class(i.object) for i in images if gt_suffix in i.original_filename]
+    images = ImageInstanceCollection().fetch_with_filter("project", nj.parameters.cytomine_id_project)
+    images = [NeubiasCytomineInput(i, name_pattern=filename_pattern) for i in images]
+    gt_images_to_process = [NeubiasCytomineInput(i.object) for i in images if gt_suffix in i.original_filename]
     in_images_to_process = {i.original_filename: i for i in images if gt_suffix not in i.original_filename}
 
     in_images = list()
@@ -67,8 +63,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         if in_filename not in in_images_to_process:
             raise ValueError("Missing input image '{}' for ground truth image '{}' (id:{}).".format(in_filename, gt.original_filename, gt.object.id))
         in_object = in_images_to_process[in_filename].object
-        in_images.append(input_class(in_object, in_path, filename_pattern))
-        gt_images.append(input_class(gt.object, gt_path, filename_pattern.format(id=in_object.id)))
+        in_images.append(NeubiasCytomineInput(in_object, in_path, filename_pattern))
+        gt_images.append(NeubiasCytomineInput(gt.object, gt_path, filename_pattern.format(id=in_object.id)))
 
     # check that all input images have a ground truth
     if len(in_images_to_process) != len(in_images):
@@ -76,10 +72,10 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         for in_image in diff:
             if not ignore_missing_gt:
                 raise ValueError("Missing ground truth for input image '{}' (id:{}).".format(in_image.original_filename, in_image.object.id))
-            in_images.append(input_class(in_image.object, in_path, filename_pattern))
+            in_images.append(NeubiasCytomineInput(in_image.object, in_path, filename_pattern))
 
     for img in (in_images + gt_images):
-        img.object.download(img.filepath, parent=True, override=False)
+        img.object.download(img.filepath, override=False)
 
     return in_images, gt_images
 
@@ -130,7 +126,7 @@ def download_attached(inputs, path, suffix="_attached", do_download=False, ignor
 
 
 def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
-                 outfolder=None, gtfolder=None, tmp_folder="tmp", is_2d=True, ignore_missing_gt=False, **kwargs):
+                 outfolder=None, gtfolder=None, tmp_folder="tmp", ignore_missing_gt=False, **kwargs):
     """Prepare data from parameters.
 
     If nodownload is false, creates four folders in `base_path`:
@@ -165,8 +161,6 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
         Full path of the folder for ground truth data. If None, defaults to '`base_path`/ground_truth'.
     tmp_folder: str
         Name (not the path) for temporary data folder.
-    is_2d: bool
-        True if the problem is a 2d one, False otherwise (3D, 4D, 3D+t).
     ignore_missing_gt: bool
         If False, an exception is raised when a ground truth images is missing. Otherwise, just skip download
     kwargs: dict
@@ -192,6 +186,10 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     tmp_path: str
         Full path to tmp data folder
     """
+    if "is_2d" in kwargs:
+        warnings.warn("Paramater 'is_2d'  in 'prepare_data' is deprecated and should not be used "
+                      "anymore. 2D/3D information is now determined automatically.",
+                      DeprecationWarning)
     # get path
     base_path = default_value(base_path, Path.home())
     working_path = os.path.join(base_path, str(nj.job.id))
@@ -210,8 +208,8 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     ignore_missing_gt = ignore_missing_gt or not kwargs.get("do_compute_metrics", True)
 
     # in all cases download input and gt
-    in_data, gt_data = download_images(nj, in_path, gt_path, is_2d=is_2d, gt_suffix=gt_suffix,
-                                       do_download=do_download, ignore_missing_gt=ignore_missing_gt)
+    in_data, gt_data = download_images(nj, in_path, gt_path, gt_suffix=gt_suffix, do_download=do_download,
+                                       ignore_missing_gt=ignore_missing_gt)
 
     # download additional data
     if problemclass == CLASS_TRETRC or problemclass == CLASS_OBJTRK:
