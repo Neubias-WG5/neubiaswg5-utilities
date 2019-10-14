@@ -98,7 +98,7 @@ def create_track_from_slices(image, slices, depth2slice, id_project, track_prefi
     """
     if label is None and len(slices) > 0:
         label = slices[0].label
-    track = Track(name="{}-{}".format(track_prefix, label), id_image=image.id, color=DEFAULT_COLOR).save()
+    track = Track(name="{}-{}".format(track_prefix, label), id_image=image.id, color=None if upload_group_id else DEFAULT_COLOR).save()
 
     if upload_group_id:
         Property(track, key="label", value=label).save()
@@ -153,10 +153,9 @@ def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id
 
     # create tracks
     tracks = TrackCollection()
-    object_track = Track("{}-{}".format(track_prefix, label), image.id, color=DEFAULT_COLOR)
-    trackline_track = Track("{}-{}-trackline".format(track_prefix, label), image.id, color=DEFAULT_COLOR)
+    object_track = Track("{}-{}".format(track_prefix, label), image.id, color=None if upload_group_id else DEFAULT_COLOR).save()
+    trackline_track = Track("{}-{}-trackline".format(track_prefix, label), image.id, color=None if upload_group_id else DEFAULT_COLOR).save()
     tracks.extend([object_track, trackline_track])
-    tracks.save()
 
     if upload_group_id:
         Property(object_track, key="label", value=label).save()
