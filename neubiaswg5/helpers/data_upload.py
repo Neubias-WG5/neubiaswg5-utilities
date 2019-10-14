@@ -66,7 +66,7 @@ def create_annotation_from_slice(_slice, id_image, image_height, id_project, lab
 
 
 def get_depth_to_slice(image_instance, time=False):
-    slices = SliceInstanceCollection().fetch_with_filter("image", image_instance.id)
+    slices = SliceInstanceCollection().fetch_with_filter("imageinstance", image_instance.id)
     return {slice.zStack if not time else slice.time: slice for slice in slices}
 
 
@@ -115,7 +115,8 @@ def create_track_from_slices(image, slices, depth2slice, id_project, track_prefi
     return track, collection
 
 
-def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id_project, upload_object=False, track_prefix="object", label=None, upload_group_id=False):
+def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id_project, upload_object=False,
+                                     track_prefix="object", label=None, upload_group_id=False):
     """Create a set of tracks and annotations to represent a tracked element. A trackline is created to reflect the
     movement of the object in the image. Optionally the object's polygon can also be uploaded.
 
@@ -167,10 +168,10 @@ def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id
     prev_line = []
     for _slice in sorted_group:
         if len(prev_line) == 0 or not prev_line[-1].equals(_slice.polygon):
-            prev_line.append(_slice.polygon)
+            prev_line.append(slice2point(_slice))
 
         if len(prev_line) == 1:
-            polygon = _slice.polygon
+            polygon = slice2point(_slice)
         else:
             polygon = LineString(prev_line)
 
@@ -194,7 +195,7 @@ def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id
     return tracks, annotations
 
 
-def mask_convert(mask, image, project_id, mask_2d_fn, mask_3d_fn, upload_group_id=False):
+def mask_convert(mask, image, project_id, mask_2d_fn, mask_3d_fn, track_prefix, upload_group_id=False):
     """Generic function to convert a mask into an annotation collection
 
     Parameters
@@ -204,6 +205,7 @@ def mask_convert(mask, image, project_id, mask_2d_fn, mask_3d_fn, upload_group_i
     project_id: int
     mask_2d_fn: callable
     mask_3d_fn: callable
+    track_prefix: str
     upload_group_id: bool
 
     Returns
@@ -224,24 +226,26 @@ def mask_convert(mask, image, project_id, mask_2d_fn, mask_3d_fn, upload_group_i
         slices = mask_3d_fn(mask)
         depth_to_slice = get_depth_to_slice(image)
         for obj_id, obj in enumerate(slices):
-            track, annotations = create_track_from_slices(
+            track, curr_annotations = create_track_from_slices(
                 image, obj, label=obj_id, depth2slice=depth_to_slice,
-                id_project=project_id, upload_group_id=upload_group_id
+                track_prefix=track_prefix, id_project=project_id,
+                upload_group_id=upload_group_id
             )
             tracks.append(track)
-            annotations.extend(annotations)
+            annotations.extend(curr_annotations)
     else:
         raise ValueError("Only supports 2D or 3D output images...")
     return tracks, annotations
 
 
-def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters
     ----------
     out_path: str
     in_image: NeubiasCytomineInput
     project_id: int
+    track_prefix: str
     upload_group_id: bool
         True for uploading annotation group id
     is_2d: bool
@@ -254,17 +258,19 @@ def extract_annotations_objseg(out_path, in_image, project_id, upload_group_id=F
         data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
         mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
+        track_prefix=track_prefix + "-object",
         upload_group_id=upload_group_id
     )
 
 
-def extract_annotations_pixcla(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters
     ----------
     out_path: str
     in_image: NeubiasCytomineInput
     project_id: int
+    track_prefix: str
     upload_group_id: bool
         True for uploading annotation group id
     is_2d: bool
@@ -277,12 +283,14 @@ def extract_annotations_pixcla(out_path, in_image, project_id, upload_group_id=F
         data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
         mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=False),
+        track_prefix=track_prefix + "-object",
         upload_group_id=upload_group_id
     )
 
 
-def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, generate_mask=False, in_path=None,
-                               result_file_suffix=".tif", has_headers=False, parse_fn=None, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_csv=False, generate_mask=False,
+                               result_file_suffix=".tif", has_headers=False, parse_fn=None, upload_group_id=False,
+                               is_2d=True, **kwargs):
     """
     Parameters:
     -----------
@@ -294,14 +302,13 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, gen
     generate_mask: bool
         If result is in a CSV, True for generating a mask based on the points in the csv. Ignored if is_csv is False.
         The mask file is generated in out_path with the name "{in_image.id}.png".
-    in_path: str
-        The path where to find input images. Required when generate mask is present.
     result_file_suffix: str
         Suffix of the result filename (prefix being the image id).
     has_headers: bool
         True if the csv contains some headers (ignored if is_csv is False)
     parse_fn: callable
         A function for extracting coordinates from the csv file (already separated) line.
+    track_prefix: str
     upload_group_id: bool
         True for uploading annotation group id
     is_2d: bool
@@ -336,19 +343,21 @@ def extract_annotations_objdet(out_path, in_image, project_id, is_csv=False, gen
             imread(path, is_2d=is_2d), image, project_id,
             mask_2d_fn=mask_to_points_2d,
             mask_3d_fn=lambda m: mask_to_points_3d(np.moveaxis(m, 0, 2), time=False, assume_unique_labels=False),
+            track_prefix=track_prefix + "-object",
             upload_group_id=upload_group_id
         )
 
     return tracks, annotations
 
 
-def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=False, is_2d=False, **kwargs):
+def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=False, **kwargs):
     """
     Parameters:
     -----------
     out_path: str
     in_image: NeubiasCytomineInput
     project_id: int
+    name_prefix: str
     upload_group_id: bool
     is_2d: bool
     kwargs: dict
@@ -373,7 +382,8 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
             image, slice_group,
             slice2point=lambda _slice: _slice.polygon,
             depth2slice=time_to_image, id_project=project_id,
-            upload_object=False, upload_group_id=upload_group_id
+            upload_object=False, track_prefix=track_prefix + "-particle",
+            upload_group_id=upload_group_id
         )
         tracks.extend(curr_tracks)
         annotations.extend(curr_annots)
@@ -381,11 +391,12 @@ def extract_annotations_prttrk(out_path, in_image, project_id, upload_group_id=F
     return tracks, annotations
 
 
-def extract_annotations_objtrk(out_path, in_image, project_id, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
     """
     out_path: str
     in_image: NeubiasCytomineInput
     project_id: int
+    track_prefix: str
     upload_group_id: bool
     is_2d: bool
     kwargs: dict
@@ -408,22 +419,24 @@ def extract_annotations_objtrk(out_path, in_image, project_id, upload_group_id=F
     for slice_group in slices:
         curr_tracks, curr_annots = create_tracking_from_slice_group(
             image, slice_group,
-            slice2point=lambda _slice: _slice.polygon.centroiud,
+            slice2point=lambda _slice: _slice.polygon.centroid,
             depth2slice=time_to_image, id_project=project_id,
-            upload_object=True, upload_group_id=upload_group_id
+            upload_object=True, upload_group_id=upload_group_id,
+            track_prefix=track_prefix + "-object"
         )
         tracks.extend(curr_tracks)
         annotations.extend(curr_annots)
     return tracks, annotations
 
 
-def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=False, is_2d=True, projection=0, **kwargs):
+def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, projection=0, **kwargs):
     """
     Parameters
     ----------
     out_path: str
     in_image: NeubiasCytomineInput
     project_id: int
+    track_prefix: str
     upload_group_id: bool
     is_2d: bool
     projection: int
@@ -437,6 +450,7 @@ def extract_annotations_lootrc(out_path, in_image, project_id, upload_group_id=F
         data, image, project_id,
         mask_2d_fn=skeleton_mask_to_objects_2d,
         mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True, projection=projection),
+        track_prefix=track_prefix + "-network",
         upload_group_id=upload_group_id
     )
     return tracks, collection
@@ -497,6 +511,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
     for in_image in nj.monitor(inputs, **monitor_params):
         curr_tracks, curr_annots = extract_fn(
             out_path, in_image, nj.project.id,
+            track_prefix=str(nj.job.id),
             upload_group_id=upload_group_id,
             is_2d=is_2d, **kwargs
         )
