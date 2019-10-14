@@ -86,7 +86,7 @@ Parameters:
 
 Returns:
 
-* `in_data` (type: `list`): list of input data. If `is_2d` then usually a list of `ImageInstance`, otherwise a list of `ImageGroup`. If `--nodownload` (i.e. `do_download` is True) was used, then usually a list of absolute path to the input images. For CLASS_TRETRC, a list of tuple containing the input as first item and attached file path as second item.
+* `in_data` (type: `list`): list of input data. If `is_2d` then usually a list of `ImageInstance`. If `--nodownload` (i.e. `do_download` is True) was used, then usually a list of absolute path to the input images. For CLASS_TRETRC, a list of tuple containing the input as first item and attached file path as second item.
 * `gt_images` (type: `list`): list of ground truth data (same format as `in_data`).
 * `in_path` (type: `str`): full path to input data folder.
 * `gt_path` (type: `str`): full path to ground truth data folder.

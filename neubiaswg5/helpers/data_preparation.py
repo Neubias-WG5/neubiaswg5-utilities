@@ -3,7 +3,7 @@ import warnings
 from pathlib import Path
 
 from cytomine import CytomineJob
-from cytomine.models import ImageInstanceCollection, ImageGroupCollection, AttachedFileCollection
+from cytomine.models import ImageInstanceCollection, AttachedFileCollection
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
 from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasCytomineInput, \
@@ -16,7 +16,7 @@ SUPPORTED_MULTI_EXTENSION = ["ome.tif"]
 def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, ignore_missing_gt=False):
     """
     If do_download is true: download input and ground truth images to in_path and gt_path respectively, and return the
-    corresponding ImageInstance or ImageGroup objects.
+    corresponding ImageInstance objects.
     If do_download is false: list and return images from folders in_path and gt_path
 
     Parameters
@@ -37,10 +37,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
     Returns
     -------
     in_images: iterable
-        subtype: ImageInstance|ImageGroup|str
         Input images
     gt_images: iterable
-        subtype: ImageInstance|ImageGroup|str
         Ground truth images
     """
     if not do_download:
@@ -169,12 +167,12 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     Returns
     -------
     in_data: list
-        List of input data. If `is_2d` then usually a list of `ImageInstance`, otherwise a list of `ImageGroup`.
+        List of input data. If `is_2d` then usually a list of `ImageInstance`.
         If `--nodownload` (i.e. `do_download` is True) was used, then usually a list of absolute path to the input
         images. For CLASS_TRETRC, a list of tuple containing the input as first item and attached file path as second
         item.
     gt_images: list
-        List of input data. Can be a list of ImageInstance, ImageGroup,...
+        List of input data. Can be a list of ImageInstance,...
         If nodownload is true, simply a list of absolute path to the ground truth images (in the same order as
         in_data).
     in_path: str
