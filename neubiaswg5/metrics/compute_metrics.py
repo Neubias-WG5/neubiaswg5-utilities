@@ -41,6 +41,7 @@ from neubiaswg5 import CLASS_LNDDET
 from .img_to_xml import *
 from .img_to_seq import *
 from .skl2obj import *
+from .swc2obj import *
 from .netmets_obj import netmets_obj
 from .node_sorter import swc_node_sorter
 from .node_sorter import findchildren
@@ -183,6 +184,26 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # infile is a path to the output .swc
         # reffile is a path to the reference .swc
 
+        gating_dist = extra_params.get("gating_dist", 5)
+        params_dict["GATING_DIST"] = gating_dist
+
+        sigma = gating_dist  # NetMets sigma is set to gating_dist since both concepts are related
+        subdiv = 4  # Set to default value
+
+        # Convert skeleton masks to OBJ files
+        swc2obj(reffile, os.path.join(tmpfolder, "GT.obj"))
+        swc2obj(infile,  os.path.join(tmpfolder, "Pred.obj"))
+
+        # Call NetMets on OBJ files
+        metres = netmets_obj(os.path.join(tmpfolder, "GT.obj"), os.path.join(tmpfolder, "Pred.obj"), sigma, subdiv)
+
+        metrics_dict["TFNR"] = metres['FNR']
+        metrics_dict["TFPR"] = metres['FPR']
+        params_dict['TSIGMA'] = sigma
+        params_dict['TSUBDIV'] = subdiv
+
+        '''
+        #ALTERNATIVE METHOD USING DIADEM
         # call node_sorter functions to order swc and saves it with the same name and path
         swc_node_sorter(infile)
 
@@ -194,7 +215,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # and finally removes any spaces.
         diadem = str(run_metric.stdout).split(':')[1].split('\\')[0].strip()
         metrics_dict["DM"] = float(diadem)
-
+        '''
     elif problemclass == CLASS_LOOTRC:
 
         Pred_ImFile = tiff.TiffFile(infile)
