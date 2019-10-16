@@ -24,15 +24,16 @@ import os
 import re
 import shutil
 import sys
-import subprocess 
+import subprocess
 
+from skimage import measure
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import confusion_matrix
 import numpy as np
-from scipy import ndimage
+from scipy import ndimage, stats
 import tifffile as tiff
 from scipy.spatial import cKDTree
 from neubiaswg5 import *
@@ -98,6 +99,24 @@ def get_dimensions(tiff, time=False):
     return T, Z, Y, X
 
 
+def fraction_overlap(gt, out):
+    score = 0
+    cnt = 0
+    outprops = measure.regionprops(measure.label(out > 0))
+    for region in measure.regionprops(measure.label(gt > 0), measure.label(out > 0)):
+        area_gt = region.area
+        outlbls = (region.intensity_image).ravel()
+        outlbls = outlbls[np.nonzero(outlbls)]
+        mode = stats.mode(outlbls)
+        lbl_out_maxovl = mode.mode
+        area_out_maxovl = mode.count
+        if lbl_out_maxovl > 0:
+            area_out = outprops[int(lbl_out_maxovl - 1)].area
+            score += min(area_out_maxovl, area_gt) / max(area_out, area_gt)
+        cnt += 1
+    return score / cnt
+
+
 def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
     # Remove all xml and txt (temporary) files in tmpfolder
     filelist = [ f for f in os.listdir(tmpfolder) if (f.endswith(".xml") or f.endswith(".txt")) ]
@@ -113,7 +132,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     # Switch problemclass
     if problemclass == CLASS_OBJSEG:
-
         # Call Visceral (compiled) to compute DICE and average Hausdorff distance
         os.system("Visceral "+infile+" "+reffile+" -use DICE,AVGDIST -xml "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
         with open(tmpfolder+"/metrics.xml", "r") as myfile:
@@ -124,8 +142,15 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         if len(bchmetrics) < 2:
             bchmetrics = [0.0, np.nan]
+
         metric_names = ["DC", "AHD"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
+
+        gt_file = tiff.TiffFile(infile)
+        image_gt = gt_file.asarray()
+        out_file = tiff.TiffFile(reffile)
+        image_out = out_file.asarray()
+        metrics_dict["FOVL"] = float(fraction_overlap(image_gt, image_out))
 
     elif problemclass == CLASS_SPTCNT:
 
