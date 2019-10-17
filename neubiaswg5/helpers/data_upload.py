@@ -1,5 +1,6 @@
 import os
 import sys
+from multiprocessing import cpu_count
 
 import numpy as np
 import imageio
@@ -518,6 +519,6 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         annotations.extend(curr_annots)
 
     nj.job.update(statusComment="Upload extracted annotations (total: {})".format(len(annotations)))
-    annotations.save()
+    annotations.save(chunk=20, n_workers=min(4, cpu_count() * 2))
 
 
