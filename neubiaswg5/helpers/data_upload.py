@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from multiprocessing import cpu_count
 
 import numpy as np
@@ -456,7 +457,7 @@ def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upl
     return tracks, collection
 
 
-def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_download=False, do_export=False, is_2d=True, **kwargs):
+def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=True, **kwargs):
     """Upload annotations or any other related results to the server.
 
     Parameters
@@ -471,10 +472,6 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         Output path
     monitor_params: dict|None
         A dictionnary of parameters to be passed to the data upload loop monitor.
-    do_download: bool
-        True if data was downloaded
-    do_export: bool
-        True if results should be exported
     is_2d: bool
         True for 2D image, False for more than two dimensions.
     kwargs: dict
@@ -482,7 +479,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, do_down
         * ObjDet/SptCnt: see function 'extract_annotations_objdet'
         * ObjSeg: see function 'extract_annotations_objseg'
     """
-    if not do_export or not do_download:
+    if not nj.flags["do_upload_annotations"]:
         return
     if monitor_params is None:
         monitor_params = dict()

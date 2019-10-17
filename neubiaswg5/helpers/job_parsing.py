@@ -1,7 +1,8 @@
 import json
 import logging
 import sys
-from argparse import ArgumentParser
+import warnings
+from argparse import ArgumentParser, Namespace
 
 from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
 
@@ -78,16 +79,25 @@ class NeubiasJob(object):
         """
         # Parse CytomineJob constructor parameters
         flags_ap = ArgumentParser()
-        flags_ap.add_argument("--nodownload", dest="do_download", action="store_false", required=False,
+        flags_ap.add_argument("--nodownload", dest="old_do_download", action="store_false", required=False, help="DEPRECATED")
+        flags_ap.add_argument("--noexport", dest="old_do_export", action="store_false", required=False, help="DEPRECATED")
+        flags_ap.add_argument("--nometrics", dest="old_do_compute_metrics", action="store_false", required=False, help="DEPRECATED")
+        flags_ap.add_argument("-l", "--local", dest="local", action="store_true", required=False,
+                              help="Local execution, the workflow will never try to contact the server.")
+        flags_ap.add_argument("-nd", "--no_download", dest="no_download", action="store_true", required=False,
                               help="Whether or not to download data from BIAFLOWS/local server. If raised, the absolute"
                                    " path path to the folder containing the input data should be provided through "
-                                   "--infolder.")
-        flags_ap.add_argument("--noexport", dest="do_export", action="store_false", required=False,
-                              help="Whether or not to upload results annotations to the BIAFLOWS/local server.")
-        flags_ap.add_argument("--nometrics", dest="do_compute_metrics", action="store_false", required=False,
-                              help="Whether or not to compute and upload the metrics to the BIAFLOWS/local server. If "
-                                   "--nodownload is raised but --nometrics is not, then the absolute path to the folder"
-                                   " containing the ground truth data should be provided through --gtfolder.")
+                                   "--infolder. Ignored if --local flag is raised.")
+        flags_ap.add_argument("-nmu", "--no_metrics_upload", dest="no_metrics_upload", action="store_true", required=False,
+                              help="Whether or not to upload the metrics to the BIAFLOWS/local server. If --no_download"
+                                   " is raised but this flag is not, then the absolute path to the folder containing "
+                                   "the ground truth data should be provided through --gtfolder. This flag is set to "
+                                   "true if --no_metrics_computation is raised. Ignored if --local flag is raised.")
+        flags_ap.add_argument("-nau", "--no_annotations_upload", dest="no_annotations_upload", action="store_true", required=False,
+                              help="Whether or not to upload results annotations to the BIAFLOWS/local server. Ignored "
+                                   "if --local flag is raised.")
+        flags_ap.add_argument("-nmc", "--no_metrics_computation", dest="no_metrics_computation", action="store_true", required=False,
+                              help="Whether or not to compute and display the metrics.")
         flags_ap.add_argument("--descriptor", dest="descriptor", default="/app/descriptor.json", required=False,
                               help="A path to a descriptor.json file. This file will be used to check parameters if the"
                                    " three 'no' flags are raised.")
@@ -100,16 +110,39 @@ class NeubiasJob(object):
         flags_ap.add_argument("--gtfolder", dest="gtfolder", default=None, required=False,
                               help="Absolute path to the container folder where the ground truth to be processed is "
                                    "stored. If not specified, a custom folder is created and used by the workflow.")
-        flags_ap.set_defaults(do_download=True, do_export=True, do_compute_metrics=True)
-        flags, _ = flags_ap.parse_known_args(argv)
+        flags_ap.set_defaults(local=False, no_download=False, no_metrics_upload=False, no_annotations_upload=False,
+                              no_metrics_computation=False, old_do_download=None, old_do_export=None,
+                              old_do_compute_metrics=None)
+        cli_flags, _ = flags_ap.parse_known_args(argv)
+
+        def check_deprecated_flag(value, name, new):
+            if value is not None:
+                warnings.warn("Flag '{}' is deprecated, use '{}' instead.".format(name, new))
+
+        check_deprecated_flag(cli_flags.old_do_download, "--nodownload", "--no_download")
+        check_deprecated_flag(cli_flags.old_do_export, "--noexport", "--no_annotations_upload")
+        check_deprecated_flag(cli_flags.old_do_compute_metrics, "--nometrics", "--no_metrics_upload")
+
+        # rewrite flags for local switches
+        flags = Namespace()
+        flags.local = cli_flags.local or (cli_flags.no_annotations_upload and cli_flags.no_metrics_upload and cli_flags.no_download)
+        flags.do_download = not (flags.local or cli_flags.no_download)
+        flags.do_upload_annotations = not (flags.local or cli_flags.no_annotations_upload)
+        flags.do_upload_metrics = not (flags.local or cli_flags.no_metrics_upload or cli_flags.no_metrics_computation)
+        flags.do_compute_metrics = not cli_flags.no_metrics_computation
+        flags.descriptor = cli_flags.descriptor
+        flags.infolder = cli_flags.infolder
+        flags.outfolder = cli_flags.outfolder
+        flags.gtfolder = cli_flags.gtfolder
 
         if not flags.do_download and flags.infolder is None:
-            raise ValueError("When --nodownload is raised, an --infolder should be specified.")
+            raise ValueError("When --no_download is raised, an --infolder should be specified.")
         if flags.do_compute_metrics and not flags.do_download and flags.gtfolder is None:
-            raise ValueError("When --nodownload is raised and --nometrics is not, a --gtfolder should be specified.")
+            raise ValueError("When --no_download is raised but metrics have to be computed, a --gtfolder should be "
+                             "specified.")
 
         # Cytomine is needed if at least one flag is not raised.
-        if flags.do_download or flags.do_export or flags.do_compute_metrics:
+        if not flags.local:
             cj = CytomineJob.from_cli(argv, **kwargs)
             cj.flags = vars(flags)  # append the flags
             return cj

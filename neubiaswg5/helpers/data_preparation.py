@@ -13,7 +13,7 @@ from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, Neubias
 SUPPORTED_MULTI_EXTENSION = ["ome.tif"]
 
 
-def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, ignore_missing_gt=False):
+def download_images(nj, in_path, gt_path, gt_suffix="_lbl", ignore_missing_gt=False):
     """
     If do_download is true: download input and ground truth images to in_path and gt_path respectively, and return the
     corresponding ImageInstance objects.
@@ -29,8 +29,6 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
         Path for ground truth images
     gt_suffix: str
         A suffix for ground truth images filename
-    do_download: bool
-        True for actually downloading the image, False for getting them from in_path and gt_path
     ignore_missing_gt: bool
         If False, an exception is raised when a ground truth images is missing. Otherwise, just skip download
 
@@ -41,7 +39,7 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", do_download=False, i
     gt_images: iterable
         Ground truth images
     """
-    if not do_download:
+    if not nj.flags["do_download"]:
         in_images = [NeubiasFilepath(os.path.join(in_path, f)) for f in os.listdir(in_path)]
         gt_images = [NeubiasFilepath(os.path.join(gt_path, f)) for f in os.listdir(gt_path)]
         return in_images, gt_images
@@ -184,10 +182,6 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     tmp_path: str
         Full path to tmp data folder
     """
-    if "is_2d" in kwargs:
-        warnings.warn("Paramater 'is_2d'  in 'prepare_data' is deprecated and should not be used "
-                      "anymore. 2D/3D information is now determined automatically.",
-                      DeprecationWarning)
     # get path
     base_path = default_value(base_path, Path.home())
     working_path = os.path.join(base_path, str(nj.job.id))
@@ -206,8 +200,7 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     ignore_missing_gt = ignore_missing_gt or not kwargs.get("do_compute_metrics", True)
 
     # in all cases download input and gt
-    in_data, gt_data = download_images(nj, in_path, gt_path, gt_suffix=gt_suffix, do_download=do_download,
-                                       ignore_missing_gt=ignore_missing_gt)
+    in_data, gt_data = download_images(nj, in_path, gt_path, gt_suffix=gt_suffix, ignore_missing_gt=ignore_missing_gt)
 
     # download additional data
     if problemclass == CLASS_TRETRC or problemclass == CLASS_OBJTRK:

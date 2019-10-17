@@ -1,5 +1,7 @@
 import logging
 import os
+import warnings
+from collections import defaultdict
 
 from cytomine import CytomineJob
 from cytomine.models import Project
@@ -38,8 +40,7 @@ def check_file(filepath, message):
     return filepath
 
 
-def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric_params=None,
-                   do_compute_metrics=False, **kwargs):
+def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric_params=None, **kwargs):
     """Upload each sample will get a value for each metrics of the given problemclass
     Parameters
     ----------
@@ -57,10 +58,8 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
         Absolute path to a temporary folder
     metric_params: dict
         Additional parameters for metric computation (forwarded to computemetrics or computemetrics_batch directly)
-    do_compute_metrics: bool
-        Whether or not to compute and upload the metrics.
     """
-    if not do_compute_metrics:
+    if not nj.flags["do_compute_metrics"]:
         return
     if len(inputs) == 0:
         nj.logger.info("Skipping metric computation because there is no images to process.")
@@ -93,12 +92,22 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
 
     results, params = computemetrics_batch(outfiles, reffiles, problemclass, tmp_path, **metric_params)
 
+    nj.logger.info("Metrics:")
+    for i, image in enumerate(inputs):
+        nj.logger.info("> {}: [{}]".format(
+            image.filename,
+            ", ".join(["{}:{}".format(metric_name, metric_values[i]) for metric_name, metric_values in results.items()])
+        ))
+
+    if not nj.flags["do_upload_metrics"]:
+        return
+
     # effectively upload metrics
     project = Project().fetch(nj.project.id)
     metrics = MetricCollection().fetch_with_filter("discipline", project.discipline)
 
     metric_collection = get_metric_result_collection(inputs[0].object)
-    per_input_metrics = dict()
+    per_input_metrics = defaultdict(dict)
     for metric_name, values in results.items():
         # check if metric is supposed to be computed for this problem class
         metric = metrics.find_by_attribute("shortName", metric_name)
@@ -115,12 +124,5 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
             image_dict = per_input_metrics.get(image.id, {})
             image_dict[metric.shortName] = image_dict.get(metric.shortName, []) + [values[i]]
             per_input_metrics[image.id] = image_dict
-
-    nj.logger.info("Metrics:")
-    for _name, _metrics in per_input_metrics.items():
-        nj.logger.info("> {}: {}".format(
-            _name,
-            ", ".join(["{}:{}".format(m, v) for m, v in _metrics.items()])
-        ))
 
     metric_collection.save()
