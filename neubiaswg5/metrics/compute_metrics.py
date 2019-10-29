@@ -81,8 +81,7 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, verbose=True, **ext
 
 
 def get_image_metadata(tiff):
-    import xml.etree.ElementTree as ET
-    return list(list(ET.fromstring(tiff.ome_metadata))[0])[0].attrib
+    return tiff.ome_metadata['Image']['Pixels']
 
 
 def get_dimensions(tiff, time=False):
