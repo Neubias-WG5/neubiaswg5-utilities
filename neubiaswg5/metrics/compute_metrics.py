@@ -147,9 +147,9 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
 
         gt_file = tiff.TiffFile(infile)
-        image_gt = gt_file.asarray()
+        image_gt = np.squeeze(gt_file.asarray())
         out_file = tiff.TiffFile(reffile)
-        image_out = out_file.asarray()
+        image_out = np.squeeze(out_file.asarray())
         metrics_dict["FOVL"] = float(fraction_overlap(image_gt, image_out))
 
     elif problemclass == CLASS_SPTCNT:
