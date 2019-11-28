@@ -126,10 +126,10 @@ def fraction_overlap(gt, out):
         area_gt = region.area
         outlbls = region.intensity_image.ravel()
         outlbls = outlbls[np.nonzero(outlbls)]
-        mode = stats.mode(outlbls)
-        lbl_out_maxovl = mode.mode[0]
-        area_out_maxovl = mode.count[0]
-        if lbl_out_maxovl > 0:
+        if outlbls.shape[0] > 0:
+            mode = stats.mode(outlbls)
+            lbl_out_maxovl = mode.mode[0]
+            area_out_maxovl = mode.count[0]
             area_out = outprops[int(lbl_out_maxovl - 1)].area
             score += min(area_out_maxovl, area_gt) / max(area_out, area_gt)
         cnt += 1
