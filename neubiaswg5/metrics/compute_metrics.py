@@ -160,8 +160,8 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         # cannot run Visceral metrics directly using label images
         binreffile = reffile[:-4] + "_visceral_binary.tif"
         bininfile = infile[:-4] + "_visceral_binary.tif"
-        tiff.imwrite(binreffile, binary_image(image_gt))
-        tiff.imwrite(bininfile, binary_image(image_out))
+        tiff.imsave(binreffile, binary_image(image_gt))
+        tiff.imsave(bininfile, binary_image(image_out))
         
         os.system("Visceral "+binreffile+" "+bininfile+" -use DICE,AVGDIST -xml "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
         with open(tmpfolder+"/metrics.xml", "r") as myfile:
