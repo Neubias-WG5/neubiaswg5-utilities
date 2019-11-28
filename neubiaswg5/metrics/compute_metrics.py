@@ -111,8 +111,9 @@ def label_image(img):
 
 def binary_image(img):
     # Returns binary image, e.g used to convert label image to binary image
-    img[img > 0] = 1
-    return img
+    bimg = img.copy()
+    bimg[bimg > 0] = 1
+    return bimg
 
 
 def fraction_overlap(gt, out):
