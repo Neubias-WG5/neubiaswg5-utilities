@@ -47,14 +47,14 @@ from .node_sorter import swc_node_sorter
 from .node_sorter import findchildren
 
 
-def computemetrics_batch(infiles, refiles, problemclass, tmpfolder, verbose=True, **extra_params):
+def computemetrics_batch(infiles, reffiles, problemclass, tmpfolder, verbose=True, **extra_params):
     """Runs compute metrics for all pairs of in and ref files.
     Metrics and parameters values are returned in a dictionary mapping the metrics and parameters names with
     a list of respective values (as many as pair of files).
     """
     metric_results = dict()
     param_results = dict()
-    for infile, reffile in zip(infiles, refiles):
+    for infile, reffile in zip(infiles, reffiles):
         metrics, params = computemetrics(infile, reffile, problemclass, tmpfolder, verbose=verbose, **extra_params)
 
         def extend_list_dict(all_dict, curr_dict):
@@ -99,17 +99,35 @@ def get_dimensions(tiff, time=False):
     return T, Z, Y, X
 
 
+def label_image(img):
+    # Returns label image. If input is already label image, then returns it.
+    hist = np.histogram(img, bins=img.max()+1)[0]
+    # If missing labels (ie. binary image 0-255) or only values 0,1
+    if (hist[0]==0).any() or len(hist[0]) == 2:
+        return skimage.measure.label(img > 0)
+    else: # Already label image
+        return img
+
+
+def binary_image(img):
+    # Returns binary image, e.g used to convert label image to binary image
+    img[img > 0] = 1
+    return img
+
+
 def fraction_overlap(gt, out):
     score = 0
     cnt = 0
-    outprops = measure.regionprops(measure.label(out > 0))
-    for region in measure.regionprops(measure.label(gt > 0), measure.label(out > 0)):
+    gt = label_image(gt)
+    out = label_image(out)
+    outprops = measure.regionprops(out)
+    for region in measure.regionprops(gt, out):
         area_gt = region.area
-        outlbls = (region.intensity_image).ravel()
+        outlbls = region.intensity_image.ravel()
         outlbls = outlbls[np.nonzero(outlbls)]
         mode = stats.mode(outlbls)
-        lbl_out_maxovl = mode.mode
-        area_out_maxovl = mode.count
+        lbl_out_maxovl = mode.mode[0]
+        area_out_maxovl = mode.count[0]
         if lbl_out_maxovl > 0:
             area_out = outprops[int(lbl_out_maxovl - 1)].area
             score += min(area_out_maxovl, area_gt) / max(area_out, area_gt)
@@ -132,8 +150,20 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
     # Switch problemclass
     if problemclass == CLASS_OBJSEG:
+        gt_file = tiff.TiffFile(reffile)
+        image_gt = np.squeeze(gt_file.asarray())
+        out_file = tiff.TiffFile(infile)
+        image_out = np.squeeze(out_file.asarray())
+
         # Call Visceral (compiled) to compute DICE and average Hausdorff distance
-        os.system("Visceral "+infile+" "+reffile+" -use DICE,AVGDIST -xml "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
+        # First create temporary binary images that are expected by Visceral
+        # cannot run Visceral metrics directly using label images
+        binreffile = reffile[:-4] + "_visceral_binary.tif"
+        bininfile = infile[:-4] + "_visceral_binary.tif"
+        tiff.imwrite(binreffile, binary_image(image_gt))
+        tiff.imwrite(bininfile, binary_image(image_out))
+        
+        os.system("Visceral "+binreffile+" "+bininfile+" -use DICE,AVGDIST -xml "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
         with open(tmpfolder+"/metrics.xml", "r") as myfile:
             # Parse returned xml file to extract all value fields
             data = myfile.read()
@@ -146,10 +176,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metric_names = ["DC", "AHD"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
 
-        gt_file = tiff.TiffFile(infile)
-        image_gt = np.squeeze(gt_file.asarray())
-        out_file = tiff.TiffFile(reffile)
-        image_out = np.squeeze(out_file.asarray())
         metrics_dict["FOVL"] = float(fraction_overlap(image_gt, image_out))
 
     elif problemclass == CLASS_SPTCNT:
