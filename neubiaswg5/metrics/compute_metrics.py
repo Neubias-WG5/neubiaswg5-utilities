@@ -104,7 +104,7 @@ def label_image(img):
     hist = np.histogram(img, bins=img.max()+1)[0]
     # If missing labels (ie. binary image 0-255) or only values 0,1
     if (hist==0).any() or len(hist) == 2:
-        return skimage.measure.label(img > 0)
+        return measure.label(img > 0)
     else: # Already label image
         return img
 
