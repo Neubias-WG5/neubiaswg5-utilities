@@ -157,14 +157,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         image_out = np.squeeze(out_file.asarray())
 
         # Call Visceral (compiled) to compute DICE and average Hausdorff distance
-        # First create temporary binary images that are expected by Visceral
-        # cannot run Visceral metrics directly using label images
-        binreffile = reffile[:-4] + "_visceral_binary.tif"
-        bininfile = infile[:-4] + "_visceral_binary.tif"
-        tiff.imsave(binreffile, binary_image(image_gt))
-        tiff.imsave(bininfile, binary_image(image_out))
-        
-        os.system("Visceral "+binreffile+" "+bininfile+" -use DICE,AVGDIST -xml "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
+        os.system("Visceral "+reffile+" "+infile+" -thd 0,00001 -use DICE,AVGDIST -xml "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
         with open(tmpfolder+"/metrics.xml", "r") as myfile:
             # Parse returned xml file to extract all value fields
             data = myfile.read()
