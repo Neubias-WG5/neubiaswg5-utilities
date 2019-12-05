@@ -67,9 +67,28 @@ def create_annotation_from_slice(_slice, id_image, image_height, id_project, lab
     return Annotation(**parameters)
 
 
-def get_depth_to_slice(image_instance, time=False):
+def get_depth_to_slice(image_instance, depth='auto'):
+    """
+    Parameters
+    ----------
+    image_instance: ImageInstance
+        An image
+    depth: str
+        One of {'auto', 'time', 'zStack'}. Which field to read for getting the depth.
+
+    Returns
+    -------
+    depth2slice: dict
+    """
     slices = SliceInstanceCollection().fetch_with_filter("imageinstance", image_instance.id)
-    return {slice.zStack if not time else slice.time: slice for slice in slices}
+    read_zstack = lambda s: s.zStack
+    read_time = lambda s: s.time
+    read_depth = read_zstack  # by default
+    if depth is 'auto' and image_instance.duration > 1:
+        read_depth = read_time
+    elif depth is 'time':
+        read_depth = read_time
+    return {read_depth(slice): slice for slice in slices}
 
 
 def create_track_from_slices(image, slices, depth2slice, id_project, track_prefix="object", label=None, upload_group_id=False):
@@ -112,7 +131,7 @@ def create_track_from_slices(image, slices, depth2slice, id_project, track_prefi
             id_image=image.id,
             id_project=id_project,
             id_tracks=[track.id],
-            slice=depth2slice[_slice.depth].id
+            slice=depth2slice[_slice.depth if _slice.time is None else _slice.time].id
         ))
     return track, collection
 
@@ -160,8 +179,8 @@ def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id
     tracks.extend([object_track, trackline_track])
 
     if upload_group_id:
-        Property(object_track, key="label", value=label).save()
-        Property(trackline_track, key="label", value=label).save()
+        Property(object_track, key="label", value=int(label)).save()
+        Property(trackline_track, key="label", value=int(label)).save()
 
     # create actual annotations
     annotations = AnnotationCollection()
@@ -176,10 +195,11 @@ def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id
         else:
             polygon = LineString(prev_line)
 
+        depth = _slice.time if _slice.depth is None else _slice.depth
         annotations.append(Annotation(
             location=change_referential(polygon, image.height).wkt,
             id_image=image.id,
-            slice=depth2slice[_slice.time].id,
+            slice=depth2slice[depth].id,
             id_project=id_project,
             id_tracks=[trackline_track.id]
         ))
@@ -188,7 +208,7 @@ def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id
             annotations.append(Annotation(
                 location=change_referential(_slice.polygon, image.height).wkt,
                 id_image=image.id,
-                slice=depth2slice[_slice.time].id,
+                slice=depth2slice[depth].id,
                 id_project=id_project,
                 id_tracks=[object_track.id]
             ))
@@ -374,7 +394,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
         raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
 
     slices = mask_to_points_3d(np.moveaxis(data, 0, 2), time=True, assume_unique_labels=True)
-    time_to_image = get_depth_to_slice(image, time=True)
+    time_to_image = get_depth_to_slice(image)
 
     tracks = TrackCollection()
     annotations = AnnotationCollection()
@@ -413,7 +433,7 @@ def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upl
         raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
 
     slices = mask_to_objects_3d(np.moveaxis(data, 0, 2), time=True, assume_unique_labels=True)
-    time_to_image = get_depth_to_slice(image, time=True)
+    time_to_image = get_depth_to_slice(image)
 
     tracks = TrackCollection()
     annotations = AnnotationCollection()
