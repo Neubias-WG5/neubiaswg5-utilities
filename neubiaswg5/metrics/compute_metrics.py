@@ -85,15 +85,30 @@ def get_image_metadata(tiff):
 
 
 def get_dimensions(tiff, time=False):
+    """
+    Parameters
+    ----------
+    tiff: TiffFile
+    time: bool
+        For 3 dimension (X, Y, Z/T), True if should expect a time dimension larger than one.
+        If specified and SizeT metadata field is of size 1, than SizeZ field is read instead of SizeT.
+        If False, same applies for SizeZ and SizeT resprectively.
+    :return:
+    """
     array = tiff.asarray()
     T, Z = 1, 1
     if array.ndim > 2:
         metadata = get_image_metadata(tiff)
         Y, X = int(metadata['SizeY']), int(metadata['SizeX'])
-        if array.ndim > 3 or time:
-            T = int(metadata['SizeT'])
-        if array.ndim > 3 or not time:
-            Z = int(metadata['SizeZ'])
+        inT = int(metadata['SizeT']) if 'SizeT' in metadata else 1
+        inZ = int(metadata['SizeZ']) if 'SizeZ' in metadata else 1
+        if array.ndim > 3:
+            T, Z = inT, inZ
+        elif array.ndim == 3:
+            if time:
+                T = inT if inT > 1 else inZ
+            else:
+                Z = inZ if inZ > 1 else inT
     else:
         Y, X = array.shape
     return T, Z, Y, X
