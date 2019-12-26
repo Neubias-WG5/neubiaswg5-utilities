@@ -36,6 +36,7 @@ import numpy as np
 from scipy import ndimage, stats
 import tifffile as tiff
 from scipy.spatial import cKDTree
+import pandas as pd
 from neubiaswg5 import *
 from neubiaswg5 import CLASS_LNDDET
 from .img_to_xml import *
