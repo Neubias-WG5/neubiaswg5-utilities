@@ -476,7 +476,10 @@ def measures_at(threshold, IOU):
 
 # Compute Average Precision for all IoU thresholds
 def compute_af1_results(ground_truth, prediction, results, image_name):
-    # Compute IoU
+    ground_truth = label_image(ground_truth)
+    prediction = label_image(prediction)
+
+    # Compute IoU    
     IOU = intersection_over_union(ground_truth, prediction)
     if IOU.shape[0] > 0:
         jaccard = np.max(IOU, axis=0).mean()
