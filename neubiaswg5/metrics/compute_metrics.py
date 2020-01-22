@@ -255,7 +255,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict["DM"] = float(diadem)
         '''
     elif problemclass == CLASS_LOOTRC:
-        from .skl2obj import *
+        from .skl2obj import skl2obj
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
         True_ImFile = tiff.TiffFile(reffile)
