@@ -42,6 +42,7 @@ from neubiaswg5 import CLASS_LNDDET
 from .img_to_xml import *
 from .img_to_seq import *
 from .swc2obj import *
+from .skl2obj import *
 from .netmets_obj import netmets_obj
 from .node_sorter import swc_node_sorter
 from .node_sorter import findchildren
@@ -255,7 +256,6 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict["DM"] = float(diadem)
         '''
     elif problemclass == CLASS_LOOTRC:
-        from .skl2obj import skl2obj
         Pred_ImFile = tiff.TiffFile(infile)
         Pred_Data = Pred_ImFile.asarray()
         True_ImFile = tiff.TiffFile(reffile)
