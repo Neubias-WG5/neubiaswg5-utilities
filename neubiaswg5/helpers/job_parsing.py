@@ -110,6 +110,14 @@ class NeubiasJob(object):
         flags_ap.add_argument("--gtfolder", dest="gtfolder", default=None, required=False,
                               help="Absolute path to the container folder where the ground truth to be processed is "
                                    "stored. If not specified, a custom folder is created and used by the workflow.")
+        flags_ap.add_argument("--batch_size", dest="batch_size", type=int, default=0, required=False,
+                              help="The size of the batch of image to process. To use in conjunction with batch_id to "
+                                   "process only a subset of images. Default value (=0) indicates that batching is "
+                                   "disabled.")
+        flags_ap.add_argument("--batch_id", dest="batch_id", type=int, default=0, required=False,
+                              help="The index of the batch of input images to process. Value should be in range [0, B[ "
+                                   "where B is the number of batches given the number of images in the project. Ignored"
+                                   " if batching is disabled.")
         flags_ap.set_defaults(local=False, no_download=False, no_metrics_upload=False, no_annotations_upload=False,
                               no_metrics_computation=False, old_do_download=None, old_do_export=None,
                               old_do_compute_metrics=None)
@@ -134,6 +142,8 @@ class NeubiasJob(object):
         flags.infolder = cli_flags.infolder
         flags.outfolder = cli_flags.outfolder
         flags.gtfolder = cli_flags.gtfolder
+        flags.batch_size = cli_flags.batch_size
+        flags.batch_id = cli_flags.batch_id
 
         if not flags.do_download and flags.infolder is None:
             raise ValueError("When --no_download is raised, an --infolder should be specified.")
