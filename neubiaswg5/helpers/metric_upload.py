@@ -61,6 +61,9 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     """
     if not nj.flags["do_compute_metrics"]:
         return
+    if nj.flags["tiling"]:
+        print("Metric computation not supported when tiling is enabled. Skip!")
+        return
     if len(inputs) == 0:
         print("Skipping metric computation because there is no images to process.")
         return
