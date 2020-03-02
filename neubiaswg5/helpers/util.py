@@ -1,7 +1,10 @@
 import os
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 
+import sldc
 from cytomine.models._utilities import resolve_pattern
+
+from neubiaswg5.helpers.data_upload import imread
 
 
 def default_value(v, default):
@@ -30,7 +33,7 @@ class NeubiasInput(metaclass=ABCMeta):
     instance.object allows to get the underlying input object
     instance.attached allows to get the list of files (as their filepath) attached to the input
     """
-    def __init__(self, obj, attached=None):
+    def __init__(self, obj, attached=None, **kwargs):
         self._obj = obj
         self._attached = list() if attached is None else attached
 
@@ -109,3 +112,61 @@ class NeubiasAttachedFile(NeubiasCytomineInput):
     @property
     def filename_attribute(self):
         return "filename"
+
+
+# ----------------------------------------
+# SLDC compatible Image classes for tiling
+# ----------------------------------------
+
+class NeubiasSldcImage(sldc.Image):
+    def __init__(self, in_image, is_2d=True):
+        self.in_image = in_image
+        # currently a proof of concept, so load image in memory
+        self.image = imread(in_image.filepath, is_2d)
+
+    @property
+    def height(self):
+        return self.image.shape[0]
+
+    @property
+    def width(self):
+        return self.image.shape[1]
+
+    @property
+    def channels(self):
+        return self.image.shape[2]
+
+    @property
+    def np_image(self):
+        return self.image
+
+#
+# class NeubiasTileBuilder(sldc.TileBuilder):
+#     def __init__(self, in_image, tile_path):
+#         self.in_image = in_image
+#         self.tile_path = tile_path
+#
+#     def build(self, *args, **kwargs):
+#         return NeubiasTile(*args, in_image=self.in_image, tile_path=self.tile_path, **kwargs)
+#
+
+
+class NeubiasTile(NeubiasInput):
+    def __init__(self, in_image, tile_path, tile):
+        super(NeubiasTile, self).__init__(in_image.object, in_image.attached)
+        self.tile = tile
+        self.in_image = in_image
+        self.tile_path = tile_path
+
+    @property
+    def filepath(self):
+        return os.path.join(self.tile_path, self.filename)
+
+    @property
+    def filename(self):
+        return "{}_{}-{}-{}-{}-{}.png".format(
+            self.in_image.filename.rsplit(".", 1)[0],
+            self.tile.identifier,
+            self.tile.abs_offset_y, self.tile.abs_offset_x,
+            self.tile.height, self.tile.width
+        )

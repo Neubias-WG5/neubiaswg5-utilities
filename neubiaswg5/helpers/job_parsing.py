@@ -118,8 +118,20 @@ class NeubiasJob(object):
                               help="The index of the batch of input images to process. Value should be in range [0, B[ "
                                    "where B is the number of batches given the number of images in the project. Ignored"
                                    " if batching is disabled.")
+        flags_ap.add_argument("-t", "--tiling", dest="tiling", action="store_true", required=False,
+                              help="Specify to enable tiling (supported by ObjSeg 2D problems only)")
+        flags_ap.add_argument("-tw", "--tile_width", dest="tile_width", type=int, default=256, required=False,
+                              help="The maximum width of a tile (ignored if tiling is disabled, see --tiling).")
+        flags_ap.add_argument("-th", "--tile_height", dest="tile_height", type=int, default=256, required=False,
+                              help="The maximum height of a tile (ignored if tiling is disabled, see --tiling).")
+        flags_ap.add_argument("-to", "--tile_overlap", dest="tile_overlap", type=int, default=32, required=False,
+                              help="The overlap between two adjacent tiles (ignored if tiling is disabled, "
+                                   "see --tiling).")
+        flags_ap.add_argument("--tilefolder", dest="tilefolder", default=None, required=False,
+                              help="Absolute path to the container folder where the tiled images is stored. If not "
+                                   "specified, a custom folder is created and used by the workflow.")
         flags_ap.set_defaults(local=False, no_download=False, no_metrics_upload=False, no_annotations_upload=False,
-                              no_metrics_computation=False, old_do_download=None, old_do_export=None,
+                              no_metrics_computation=False, old_do_download=None, old_do_export=None, tiling=False,
                               old_do_compute_metrics=None)
         cli_flags, _ = flags_ap.parse_known_args(argv)
 
@@ -144,6 +156,11 @@ class NeubiasJob(object):
         flags.gtfolder = cli_flags.gtfolder
         flags.batch_size = cli_flags.batch_size
         flags.batch_id = cli_flags.batch_id
+        flags.tiling = cli_flags.tiling
+        flags.tile_width = cli_flags.tile_width
+        flags.tile_height = cli_flags.tile_height
+        flags.tile_overlap = cli_flags.tile_overlap
+        flags.tilefolder = cli_flags.tilefolder
 
         if not flags.do_download and flags.infolder is None:
             raise ValueError("When --no_download is raised, an --infolder should be specified.")

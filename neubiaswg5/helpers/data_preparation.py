@@ -5,11 +5,12 @@ from pathlib import Path
 
 from cytomine import CytomineJob
 from cytomine.models import ImageInstanceCollection, AttachedFileCollection
+from sldc import TileTopology, DefaultTileBuilder
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
+from neubiaswg5.helpers.data_upload import imwrite
 from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasCytomineInput, \
-    NeubiasFilepath, NeubiasAttachedFile, split_filename
-
+    NeubiasFilepath, NeubiasAttachedFile, split_filename, NeubiasSldcImage, NeubiasTile
 
 SUPPORTED_MULTI_EXTENSION = ["ome.tif"]
 
@@ -169,6 +170,39 @@ def download_attached(inputs, path, suffix="_attached", do_download=False, ignor
         in_image.attached.append(attached_file)
 
 
+def make_tiles(in_data, tile_path, tile_width=256, tile_height=256, tile_overlap=32):
+    """Split input images into tiles
+
+    Parameters
+    ----------
+    in_data: iterable
+        The input images, to split into tiles
+    tile_path: str
+        Filepath where the tiles should be saved
+    tile_width: int
+        Tile width
+    tile_height: int
+        Tile height
+    tile_overlap: int
+        Tile overlap
+
+    Returns
+    -------
+    tiles: iterable
+        A list of all generated tiles
+    """
+    tiles = list()
+    for in_image in in_data:
+        sldc_image = NeubiasSldcImage(in_image, is_2d=True)  # support 2D-only for now
+        tile_builder = DefaultTileBuilder()
+        topology = sldc_image.tile_topology(tile_builder, max_width=tile_width, max_height=tile_height, overlap=tile_overlap)
+        for tile in topology:
+            neubias_tile = NeubiasTile(in_image, tile_path, tile)
+            imwrite(neubias_tile.filepath, tile.np_image, is_2d=True)
+            tiles.append(neubias_tile)
+    return tiles
+
+
 def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download=False, infolder=None,
                  outfolder=None, gtfolder=None, tmp_folder="tmp", ignore_missing_gt=False, **kwargs):
     """Prepare data from parameters.
@@ -255,5 +289,17 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     if problemclass == CLASS_TRETRC or problemclass == CLASS_OBJTRK:
         suffix = kwargs.get("suffix", "_attached")
         download_attached(in_data, gt_path, suffix=suffix, do_download=do_download, ignore_missing_gt=ignore_missing_gt)
+
+    # if tiling enabled, replace in_data with list of tiles
+    if nj.flags["tiling"]:
+        tile_path = default_value(nj.flags["tilefolder"], os.path.join(base_path, "tiles"))
+        makedirs_ifnotexists(tile_path)
+        # replace in_data with tiles
+        in_data = make_tiles(
+            in_data, tile_path,
+            tile_height=nj.flags["tile_height"],
+            tile_width=nj.flags["tile_width"],
+            tile_overlap=nj.flags["tile_overlap"]
+        )
 
     return in_data, gt_data, in_path, gt_path, out_path, tmp_path
