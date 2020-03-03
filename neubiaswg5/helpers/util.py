@@ -4,8 +4,6 @@ from abc import ABCMeta, abstractmethod
 import sldc
 from cytomine.models._utilities import resolve_pattern
 
-from neubiaswg5.helpers.data_upload import imread
-
 
 def default_value(v, default):
     return default if v is None else v
@@ -120,6 +118,7 @@ class NeubiasAttachedFile(NeubiasCytomineInput):
 
 class NeubiasSldcImage(sldc.Image):
     def __init__(self, in_image, is_2d=True):
+        from .data_upload import imread
         self.in_image = in_image
         # currently a proof of concept, so load image in memory
         self.image = imread(in_image.filepath, is_2d)
@@ -154,9 +153,10 @@ class NeubiasTile(NeubiasInput):
 
     @property
     def filename(self):
-        return "{}_{}-{}-{}-{}-{}.png".format(
+        extension = self.in_image.filename.rsplit(".", 1)[1]
+        return "{}_{}-{}-{}-{}-{}.{}".format(
             self.in_image.filename.rsplit(".", 1)[0],
             self.tile.identifier,
             self.tile.abs_offset_y, self.tile.abs_offset_x,
-            self.tile.height, self.tile.width
+            self.tile.height, self.tile.width, extension
         )
