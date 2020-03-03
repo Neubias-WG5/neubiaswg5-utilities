@@ -140,16 +140,6 @@ class NeubiasSldcImage(sldc.Image):
     def np_image(self):
         return self.image
 
-#
-# class NeubiasTileBuilder(sldc.TileBuilder):
-#     def __init__(self, in_image, tile_path):
-#         self.in_image = in_image
-#         self.tile_path = tile_path
-#
-#     def build(self, *args, **kwargs):
-#         return NeubiasTile(*args, in_image=self.in_image, tile_path=self.tile_path, **kwargs)
-#
-
 
 class NeubiasTile(NeubiasInput):
     def __init__(self, in_image, tile_path, tile):

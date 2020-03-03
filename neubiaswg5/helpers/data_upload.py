@@ -1,6 +1,6 @@
 import os
 import sys
-import warnings
+from collections import defaultdict
 from multiprocessing import cpu_count
 
 import numpy as np
@@ -10,8 +10,10 @@ from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, 
 from cytomine.models.image import SliceInstanceCollection
 from cytomine.models.track import Track, TrackCollection
 from shapely.geometry import LineString
+from sldc import DefaultTileBuilder, SemanticMerger
 
 from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
+from neubiaswg5.helpers.util import NeubiasSldcImage, NeubiasTile
 from neubiaswg5.problemclass import *
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
     slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
@@ -284,6 +286,51 @@ def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upl
     )
 
 
+def extract_tiled_annotations(in_tiles, nj):
+    """
+    in_images: iterable
+        List of NeubiasTile
+    nj: NeubiasJob
+        A neubias job object
+    """
+    # regroup tiles by original images
+    grouped_tiles = defaultdict(list)
+    for in_tile in in_tiles:
+        grouped_tiles[in_tile.in_image.original_filepath].append(in_tile)
+
+    default_tile_builder = DefaultTileBuilder()
+    annotations = AnnotationCollection()
+    for tiles in grouped_tiles.values():
+        # recreate the topology
+        in_image = tiles[0].in_image
+        topology = NeubiasSldcImage(in_image, is_2d=True).tile_topology(
+            default_tile_builder,
+            max_width=nj.flags["tile_width"],
+            max_height=nj.flags["tile_height"],
+            overlap=nj.flags["tile_overlap"])
+
+        # extract polygons for each tile
+        ids, polygons = list(), list()
+        label = -1
+        for tile in tiles:
+            slices = mask_to_objects_2d(imread(tile.filepath, is_2d=True), offset=tile.abs_offset)
+            ids.append(tile.identifier)
+            polygons.append([s.polygon for s in slices])
+            # save label for use after merging
+            if len(slices) > 0:
+                label = slices[0]
+
+        # merge
+        merged = SemanticMerger(tolerance=1).merge(ids, polygons, topology)
+        annotations.extend([create_annotation_from_slice(
+            _slice=AnnotationSlice(p, label),
+            id_image=in_image.object.id,
+            image_height=in_image.object.height,
+            id_project=nj.project.id,
+        ) for p in merged])
+    return annotations
+
+
 def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
     """
     Parameters
@@ -501,39 +548,46 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
     """
     if not nj.flags["do_upload_annotations"]:
         return
+    if nj.flags["tiling"] and problemclass != CLASS_OBJSEG:
+        print("Annotation upload is only supported for object segmentation when tiling is enabled.. skipping !")
+        return
     if monitor_params is None:
         monitor_params = dict()
 
-    if problemclass == CLASS_OBJSEG:
-        extract_fn = extract_annotations_objseg
-    elif problemclass == CLASS_PIXCLA:
-        extract_fn = extract_annotations_pixcla
-    elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT or problemclass == CLASS_LNDDET:
-        extract_fn = extract_annotations_objdet
-    elif problemclass == CLASS_LOOTRC or problemclass == CLASS_TRETRC:
-        extract_fn = extract_annotations_lootrc
-    elif problemclass == CLASS_PRTTRK:
-        extract_fn = extract_annotations_prttrk
-    elif problemclass == CLASS_OBJTRK:
-        extract_fn = extract_annotations_objtrk
-    else:
-        raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
-
-    # whether or not to upload a unique identifier as a property with each detected object
-    upload_group_id = not is_2d or problemclass in {CLASS_OBJTRK, CLASS_PRTTRK}
-
-    tracks = TrackCollection()
     annotations = AnnotationCollection()
-    monitor_params["prefix"] = "Extract masks/points/... from output data"
-    for in_image in nj.monitor(inputs, **monitor_params):
-        curr_tracks, curr_annots = extract_fn(
-            out_path, in_image, nj.project.id,
-            track_prefix=str(nj.job.id),
-            upload_group_id=upload_group_id,
-            is_2d=is_2d, **kwargs
-        )
-        tracks.extend(curr_tracks)
-        annotations.extend(curr_annots)
+
+    if nj.flags["tiling"]:
+        annotations.extend(extract_tiled_annotations(inputs, nj))
+    else:
+        if problemclass == CLASS_OBJSEG:
+            extract_fn = extract_annotations_objseg
+        elif problemclass == CLASS_PIXCLA:
+            extract_fn = extract_annotations_pixcla
+        elif problemclass == CLASS_OBJDET or problemclass == CLASS_SPTCNT or problemclass == CLASS_LNDDET:
+            extract_fn = extract_annotations_objdet
+        elif problemclass == CLASS_LOOTRC or problemclass == CLASS_TRETRC:
+            extract_fn = extract_annotations_lootrc
+        elif problemclass == CLASS_PRTTRK:
+            extract_fn = extract_annotations_prttrk
+        elif problemclass == CLASS_OBJTRK:
+            extract_fn = extract_annotations_objtrk
+        else:
+            raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
+
+        # whether or not to upload a unique identifier as a property with each detected object
+        upload_group_id = not is_2d or problemclass in {CLASS_OBJTRK, CLASS_PRTTRK}
+
+        tracks = TrackCollection()
+        monitor_params["prefix"] = "Extract masks/points/... from output data"
+        for in_image in nj.monitor(inputs, **monitor_params):
+            curr_tracks, curr_annots = extract_fn(
+                out_path, in_image, nj.project.id,
+                track_prefix=str(nj.job.id),
+                upload_group_id=upload_group_id,
+                is_2d=is_2d, **kwargs
+            )
+            tracks.extend(curr_tracks)
+            annotations.extend(curr_annots)
 
     nj.job.update(statusComment="Upload extracted annotations (total: {})".format(len(annotations)))
     annotations.save(chunk=20, n_workers=min(4, cpu_count() * 2))
