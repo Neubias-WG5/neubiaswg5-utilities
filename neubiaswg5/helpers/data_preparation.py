@@ -295,6 +295,7 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
         tile_path = default_value(nj.flags["tilefolder"], os.path.join(base_path, "tiles"))
         makedirs_ifnotexists(tile_path)
         # replace in_data with tiles
+        in_path = tile_path
         in_data = make_tiles(
             in_data, tile_path,
             tile_height=nj.flags["tile_height"],
