@@ -191,17 +191,15 @@ def _locate(segmented, offset=None):
                 components.append(LineString(exterior))
             elif len(exterior) > 2:
                 polygon = Polygon(exterior, interiors)
-                polygon = transform(polygon)
                 if polygon.is_valid:  # some polygons might be invalid
                     components.append(polygon)
                 else:
                     fixed = fix_geometry(polygon)
-                    if fixed.is_valid and not fixed.is_empty:
+                    if fixed.is_valid and polygon.is_empty == fixed.is_empty:
                         components.append(fixed)
                     else:
                         warn("Attempted to fix invalidity '{}' in polygon but failed... "
-                             "Output polygon still invalid '{}'".format(explain_validity(polygon),
-                                                                        explain_validity(fixed)))
+                             "Output polygon still invalid '{}'".format(explain_validity(polygon), "now empty" if fixed.is_empty else explain_validity(fixed)))
 
             # check if there is another top contour
             if hierarchy[0][top_index][0] != -1:
@@ -211,7 +209,7 @@ def _locate(segmented, offset=None):
 
     del contours
     del hierarchy
-    return components
+    return [transform(p) for p in components]
 
 
 def get_polygon_inner_point(polygon):
