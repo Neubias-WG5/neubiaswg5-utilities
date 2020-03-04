@@ -3,7 +3,7 @@ from unittest import TestCase
 import numpy as np
 from skimage.io import imsave
 
-from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d
+from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, representative_point
 from shapely.geometry import Polygon, box, LineString
 
 from neubiaswg5.exporter.export_util import draw_linestring
@@ -20,7 +20,7 @@ class TestMaskToObject2D(TestCase):
 
         self.assertEqual(len(slices), 1)
         self.assertEqual(slices[0].label, 255)
-        self.assertTrue(slices[0].polygon.equals(box(50, 150, 150, 250)), msg="Polygon is equal")
+        self.assertTrue(slices[0].polygon.equals(box(50, 150, 151, 251)), msg="Polygon is equal")
 
     def testOffset(self):
         image = np.zeros([300, 200], dtype=np.uint8)
@@ -30,7 +30,7 @@ class TestMaskToObject2D(TestCase):
 
         self.assertEqual(len(slices), 1)
         self.assertEqual(slices[0].label, 255)
-        self.assertTrue(slices[0].polygon.equals(box(305, 470, 405, 570)), msg="Polygon is equal")
+        self.assertTrue(slices[0].polygon.equals(box(305, 470, 406, 571)), msg="Polygon is equal")
 
     def testSeveralObjects(self):
         image = np.zeros([300, 200], dtype=np.uint8)
@@ -43,9 +43,9 @@ class TestMaskToObject2D(TestCase):
 
         self.assertEqual(len(slices), 2)
         self.assertEqual(slices[0].label, 255)
-        self.assertTrue(slices[0].polygon.equals(box(50, 150, 100, 200)), msg="Polygon is equal")
+        self.assertTrue(slices[0].polygon.equals(box(50, 150, 101, 201)), msg="Polygon is equal")
         self.assertEqual(slices[1].label, 127)
-        self.assertTrue(slices[1].polygon.equals(box(105, 205, 155, 255)), msg="Polygon is equal")
+        self.assertTrue(slices[1].polygon.equals(box(105, 205, 156, 256)), msg="Polygon is equal")
 
     def testMultipartPolygon(self):
         image = np.zeros([300, 200], dtype=np.uint8)
@@ -84,9 +84,9 @@ class TestMaskToObject2D(TestCase):
 
         self.assertEqual(len(slices), 2)
         self.assertEqual(slices[0].label, 255)
-        self.assertTrue(slices[0].polygon.equals(box(50, 150, 100, 200)), msg="Polygon is equal")
+        self.assertTrue(slices[0].polygon.equals(box(50, 150, 101, 201)), msg="Polygon is equal")
         self.assertEqual(slices[1].label, 127)
-        self.assertTrue(slices[1].polygon.equals(box(102, 150, 152, 200)), msg="Polygon is equal")
+        self.assertTrue(slices[1].polygon.equals(box(102, 150, 153, 201)), msg="Polygon is equal")
 
     def testSmallObject(self):
         image = np.zeros([100, 100], dtype=np.uint8)
@@ -101,27 +101,6 @@ class TestMaskToObject2D(TestCase):
         self.assertEqual(slices[0].label, 255)
         self.assertEqual(slices[1].label, 127)
 
-    def testStandalonePixels(self):
-        mask = np.array([
-            [0, 0, 0, 0, 0],
-            [0, 1, 1, 0, 0],
-            [0, 0, 1, 0, 0],
-            [0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 0]
-        ])
-
-        rotated = [
-            (mask, Polygon([(1, 1), (2, 2), (2, 1), (1, 1)])),
-            (mask[::-1, :], Polygon([(2, 2), (1, 3), (2, 3), (2, 2)])),
-            (mask[:, ::-1], Polygon([(2, 1), (2, 2), (3, 1), (2, 1)])),
-            (mask[::-1, ::-1], Polygon([(2, 2), (2, 3), (3, 3), (2, 2)]))
-        ]
-
-        for m, p in rotated:
-            slices = mask_to_objects_2d(m)
-            self.assertEqual(len(slices), 1)
-            self.assertTrue(slices[0].polygon.equals(p))
-
     def testOtherPixels(self):
         mask = np.array([
             [0, 0, 0, 0, 0, 0],
@@ -130,12 +109,14 @@ class TestMaskToObject2D(TestCase):
             [0, 0, 0, 1, 0, 0],
             [0, 0, 0, 0, 0, 0]
         ])
-        p1 = Polygon([(1, 1), (2, 2), (2, 1), (1, 1)])
-        p2 = Polygon([(4, 1), (4, 2), (5, 1), (4, 1)])
+        p1 = Polygon([(1, 1), (1, 2), (2, 2), (2, 3), (3, 3), (3, 1), (1, 1)])
+        p2 = Polygon([(4, 1), (4, 3), (5, 3), (5, 2), (6, 2), (6, 1), (4, 1)])
+        p3 = Polygon([(3, 3), (3, 4), (4, 4), (4, 3), (3, 3)])
         slices = mask_to_objects_2d(mask)
-        self.assertEqual(len(slices), 2)
+        self.assertEqual(len(slices), 3)
         self.assertTrue(slices[0].polygon.equals(p1))
         self.assertTrue(slices[1].polygon.equals(p2))
+        self.assertTrue(slices[2].polygon.equals(p3))
 
     def testTwoPoints(self):
         mask = np.array([
@@ -143,11 +124,18 @@ class TestMaskToObject2D(TestCase):
             [0, 1, 1, 0],
             [0, 0, 0, 0]
         ])
-        polygon = LineString([(1, 1), (2, 1)])
+        polygon = Polygon([(1, 1), (1, 2), (3, 2), (3, 1), (1, 1)])
         slices = mask_to_objects_2d(mask)
         self.assertEqual(len(slices), 1)
         self.assertTrue(slices[0].polygon.equals(polygon))
 
+    def testRepresentativePoint(self):
+        image = np.zeros([300, 200], dtype=np.uint8)
+        image = draw_square_by_corner(image, 50, (150, 50), color=255)
+        slices = mask_to_objects_2d(image)
+
+        x, y = representative_point(slices[0].polygon, image, label=255)
+        self.assertEqual(image[y, x], 255)
 
 class TestMaskToObject3D(TestCase):
     def testTwoObjectsOneSpanning(self):
@@ -166,13 +154,13 @@ class TestMaskToObject3D(TestCase):
         slice1 = fslice1[0]
         self.assertEqual(slice1[0].label, 100)
         self.assertEqual(slice1[0].depth, 0)
-        self.assertTrue(slice1[0].polygon.equals(box(10, 5, 20, 15)))
+        self.assertTrue(slice1[0].polygon.equals(box(10, 5, 21, 16)))
         self.assertEqual(slice1[1].label, 100)
         self.assertEqual(slice1[1].depth, 1)
-        self.assertTrue(slice1[1].polygon.equals(box(10, 5, 20, 15)))
+        self.assertTrue(slice1[1].polygon.equals(box(10, 5, 21, 16)))
         self.assertEqual(slice1[2].label, 100)
         self.assertEqual(slice1[2].depth, 2)
-        self.assertTrue(slice1[2].polygon.equals(box(10, 5, 22, 17)))
+        self.assertTrue(slice1[2].polygon.equals(box(10, 5, 23, 18)))
 
         fslice2 = [sl for sl in slices if len(sl) == 1]
         self.assertEqual(len(fslice2), 1, msg="there is exactly one object with one slice")
@@ -180,7 +168,7 @@ class TestMaskToObject3D(TestCase):
         self.assertEqual(len(slice2), 1)
         self.assertEqual(slice2[0].label, 200)
         self.assertEqual(slice2[0].depth, 1)
-        self.assertTrue(slice2[0].polygon.equals(box(40, 45, 65, 70)))
+        self.assertTrue(slice2[0].polygon.equals(box(40, 45, 66, 71)))
 
 
 class TestSkeletonMaskToObject(TestCase):
