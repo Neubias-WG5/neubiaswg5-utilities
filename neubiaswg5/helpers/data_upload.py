@@ -296,7 +296,7 @@ def extract_tiled_annotations(in_tiles, nj):
     # regroup tiles by original images
     grouped_tiles = defaultdict(list)
     for in_tile in in_tiles:
-        grouped_tiles[in_tile.in_image.original_filepath].append(in_tile)
+        grouped_tiles[in_tile.in_image.original_filename].append(in_tile)
 
     default_tile_builder = DefaultTileBuilder()
     annotations = AnnotationCollection()
@@ -313,8 +313,8 @@ def extract_tiled_annotations(in_tiles, nj):
         ids, polygons = list(), list()
         label = -1
         for tile in tiles:
-            slices = mask_to_objects_2d(imread(tile.filepath, is_2d=True), offset=tile.abs_offset)
-            ids.append(tile.identifier)
+            slices = mask_to_objects_2d(imread(tile.filepath, is_2d=True), offset=tile.tile.abs_offset)
+            ids.append(tile.tile.identifier)
             polygons.append([s.polygon for s in slices])
             # save label for use after merging
             if len(slices) > 0:
