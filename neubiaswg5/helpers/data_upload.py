@@ -286,12 +286,16 @@ def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upl
     )
 
 
-def extract_tiled_annotations(in_tiles, out_path, nj):
+def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
     """
     in_images: iterable
         List of NeubiasTile
+    out_path: str
+        Path of output tiles
     nj: NeubiasJob
         A neubias job object
+    label_merging: bool
+        True for merging only polygons having the same label. False for merging based on geometry only
     """
     # regroup tiles by original images
     grouped_tiles = defaultdict(list)
@@ -310,19 +314,20 @@ def extract_tiled_annotations(in_tiles, out_path, nj):
             overlap=nj.flags["tile_overlap"])
 
         # extract polygons for each tile
-        ids, polygons = list(), list()
+        ids, polygons, labels = list(), list(), list()
         label = -1
         for tile in tiles:
             out_tile_path = os.path.join(out_path, tile.filename)
             slices = mask_to_objects_2d(imread(out_tile_path, is_2d=True), offset=tile.tile.abs_offset)
             ids.append(tile.tile.identifier)
             polygons.append([s.polygon for s in slices])
+            labels.append([s.label for s in slices])
             # save label for use after merging
             if len(slices) > 0:
                 label = slices[0]
 
         # merge
-        merged = SemanticMerger(tolerance=0).merge(ids, polygons, topology)
+        merged = SemanticMerger(tolerance=0).merge(ids, polygons, topology, labels=labels if label_merging else None)
         annotations.extend([create_annotation_from_slice(
             _slice=AnnotationSlice(p, label),
             id_image=in_image.object.id,
@@ -558,7 +563,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
     annotations = AnnotationCollection()
 
     if nj.flags["tiling"]:
-        annotations.extend(extract_tiled_annotations(inputs, out_path, nj))
+        annotations.extend(extract_tiled_annotations(inputs, out_path, nj, label_merging=problemclass == CLASS_PIXCLA))
     else:
         if problemclass == CLASS_OBJSEG:
             extract_fn = extract_annotations_objseg
