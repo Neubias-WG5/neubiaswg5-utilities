@@ -286,7 +286,7 @@ def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upl
     )
 
 
-def extract_tiled_annotations(in_tiles, nj):
+def extract_tiled_annotations(in_tiles, out_path, nj):
     """
     in_images: iterable
         List of NeubiasTile
@@ -313,7 +313,8 @@ def extract_tiled_annotations(in_tiles, nj):
         ids, polygons = list(), list()
         label = -1
         for tile in tiles:
-            slices = mask_to_objects_2d(imread(tile.filepath, is_2d=True), offset=tile.tile.abs_offset)
+            out_tile_path = os.path.join(out_path, tile.filename)
+            slices = mask_to_objects_2d(imread(out_tile_path, is_2d=True), offset=tile.tile.abs_offset)
             ids.append(tile.tile.identifier)
             polygons.append([s.polygon for s in slices])
             # save label for use after merging
@@ -321,7 +322,7 @@ def extract_tiled_annotations(in_tiles, nj):
                 label = slices[0]
 
         # merge
-        merged = SemanticMerger(tolerance=1).merge(ids, polygons, topology)
+        merged = SemanticMerger(tolerance=0).merge(ids, polygons, topology)
         annotations.extend([create_annotation_from_slice(
             _slice=AnnotationSlice(p, label),
             id_image=in_image.object.id,
@@ -548,8 +549,8 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
     """
     if not nj.flags["do_upload_annotations"]:
         return
-    if nj.flags["tiling"] and problemclass != CLASS_OBJSEG:
-        print("Annotation upload is only supported for object segmentation when tiling is enabled.. skipping !")
+    if nj.flags["tiling"] and problemclass != CLASS_OBJSEG and problemclass != CLASS_PIXCLA:
+        print("Annotation upload is only supported for one of {ObjSeg, PixCla} when tiling is enabled.. skipping !")
         return
     if monitor_params is None:
         monitor_params = dict()
@@ -557,7 +558,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
     annotations = AnnotationCollection()
 
     if nj.flags["tiling"]:
-        annotations.extend(extract_tiled_annotations(inputs, nj))
+        annotations.extend(extract_tiled_annotations(inputs, out_path, nj))
     else:
         if problemclass == CLASS_OBJSEG:
             extract_fn = extract_annotations_objseg
