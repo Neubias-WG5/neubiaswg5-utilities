@@ -327,7 +327,9 @@ def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
                 label = slices[0]
 
         # merge
-        merged = SemanticMerger(tolerance=0).merge(ids, polygons, topology, labels=labels if label_merging else None)
+        merged = SemanticMerger(tolerance=1).merge(ids, polygons, topology, labels=labels if label_merging else None)
+        if label_merging:
+            merged = merged[0]
         annotations.extend([create_annotation_from_slice(
             _slice=AnnotationSlice(p, label),
             id_image=in_image.object.id,
