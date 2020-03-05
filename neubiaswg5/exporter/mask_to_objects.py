@@ -4,7 +4,7 @@ from collections import defaultdict
 import numpy as np
 from affine import Affine
 from rasterio.features import shapes
-from shapely.geometry import shape
+from shapely.geometry import shape, box, Polygon, MultiPolygon
 from skimage.measure import label as label_fn
 
 
@@ -40,6 +40,53 @@ class AnnotationSlice(object):
 
 def clamp(x, l, h):
     return max(l, min(h, x))
+
+
+def geom_as_list(geometry):
+    """Return the list of sub-polygon a polygon is made up of"""
+    if geometry.geom_type == "Polygon":
+        return [geometry]
+    elif geometry.geom_type == "MultiPolygon":
+        return geometry.geoms
+
+
+def linear_ring_is_valid(ring):
+    points = set([(x, y) for x, y in ring.coords])
+    return len(points) >= 3
+
+
+def fix_geometry(geometry):
+    """Attempts to fix an invalid geometry (from https://goo.gl/nfivMh)"""
+    try:
+        return geometry.buffer(0)
+    except ValueError:
+        pass
+
+    polygons = geom_as_list(geometry)
+
+    fixed_polygons = list()
+    for i, polygon in enumerate(polygons):
+        if not linear_ring_is_valid(polygon.exterior):
+            continue
+
+        interiors = []
+        for ring in polygon.interiors:
+            if linear_ring_is_valid(ring):
+                interiors.append(ring)
+
+        fixed_polygon = Polygon(polygon.exterior, interiors)
+
+        try:
+            fixed_polygon = fixed_polygon.buffer(0)
+        except ValueError:
+            continue
+
+        fixed_polygons.extend(geom_as_list(fixed_polygon))
+
+    if len(fixed_polygons) > 0:
+        return MultiPolygon(fixed_polygons)
+    else:
+        return None
 
 
 def representative_point(polygon, mask, label, offset=None):
@@ -114,10 +161,15 @@ def mask_to_objects_2d(mask, background=0, offset=None):
         offset = (0, 0)
     exclusion = np.logical_not(mask == background)
     affine = Affine(1, 0, offset[0], 0, 1, offset[1])
-    return [
-        AnnotationSlice(polygon=shape(gjson), label=int(label))
-        for gjson, label in shapes(mask.copy(), mask=exclusion, transform=affine)
-    ]
+    slices = list()
+    for gjson, label in shapes(mask.copy(), mask=exclusion, transform=affine):
+        polygon = shape(gjson)
+        if not polygon.is_valid:  # attempt to fix
+            polygon = fix_geometry(polygon)
+        if not polygon.is_valid:  # could not be fixed
+            continue
+        slices.append(AnnotationSlice(polygon=polygon, label=int(label)))
+    return slices
 
 
 def mask_to_objects_3d(mask, background=0, offset=None, assume_unique_labels=False, time=False):
@@ -156,6 +208,7 @@ def mask_to_objects_3d(mask, background=0, offset=None, assume_unique_labels=Fal
     offset_xy = offset[:2]
     offset_z = offset[-1]
     objects = defaultdict(list)  # maps object label with list of slices (as object_3d_type objects)
+    image_box = box(offset[0], offset[1], offset[0] + mask.shape[1] - 1, offset[1] + mask.shape[1] - 1)
     for d in range(depth):
         slice_objects = mask_to_objects_2d(label_img[:, :, d].copy(), background, offset=offset_xy)
         for slice_object in slice_objects:
@@ -164,7 +217,7 @@ def mask_to_objects_3d(mask, background=0, offset=None, assume_unique_labels=Fal
                 x, y = representative_point(slice_object.polygon, label_img, slice_object.label, offset)
                 label = mask[y, x]
             objects[label].append(AnnotationSlice(
-                polygon=slice_object.polygon,
+                polygon=image_box.intersection(slice_object.polygon),  # to filter part of annot. outside of the mask
                 label=label,
                 depth=d + offset_z if not time else None,
                 time=d + offset_z if time else None
