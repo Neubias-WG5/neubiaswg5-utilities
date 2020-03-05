@@ -556,8 +556,8 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
     """
     if not nj.flags["do_upload_annotations"]:
         return
-    if nj.flags["tiling"] and problemclass != CLASS_OBJSEG and problemclass != CLASS_PIXCLA:
-        print("Annotation upload is only supported for one of {ObjSeg, PixCla} when tiling is enabled.. skipping !")
+    if nj.flags["tiling"] and ((problemclass != CLASS_OBJSEG and problemclass != CLASS_PIXCLA) or not is_2d):
+        print("Annot. upload is only supported for one of {ObjSeg, PixCla} in 2D when tiling is enabled.. skipping !")
         return
     if monitor_params is None:
         monitor_params = dict()
